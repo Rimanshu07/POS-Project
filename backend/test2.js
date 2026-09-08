@@ -1,0 +1,1 @@
+const reportsService = require('./modules/reports/reports.service'); const { PrismaClient } = require('@prisma/client'); const prisma = new PrismaClient(); reportsService.getSalesReport({ preset: 'today', groupBy: 'date' }).then(console.log).catch(console.error).finally(() => prisma.$disconnect());

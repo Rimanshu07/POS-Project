@@ -1,0 +1,95 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-[#F9FAFB] text-[#1E293B] antialiased;
+    font-family: 'Inter', sans-serif;
+  }
+  
+  /* Smooth scroll and selection */
+  html {
+    scroll-behavior: smooth;
+  }
+  ::selection {
+    @apply bg-indigo-500 text-white;
+  }
+}
+
+@layer components {
+  /* Modern soft card shadow */
+  .card-shadow {
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+  }
+  
+  /* Smooth transition utilities */
+  .transition-modern {
+    @apply transition-all duration-200 ease-in-out;
+  }
+}
+
+@media print {
+  /* Hide all elements by default */
+  body * {
+    visibility: hidden;
+  }
+  
+  /* Force all elements to allow overflow */
+  * {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+    transform: none !important;
+  }
+
+  /* Invoice print area (InvoiceModal) */
+  #invoice-print-area, #invoice-print-area * {
+    visibility: visible;
+  }
+  #invoice-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* A4 Invoice print area */
+  #invoice-a4-print-area, #invoice-a4-print-area * {
+    visibility: visible;
+  }
+  #invoice-a4-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Receipt print area (Print Receipt button in OrderDetailsModal) */
+  #print-receipt, #print-receipt * {
+    visibility: visible;
+  }
+  #print-receipt {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  /* Reports print area */
+  #reports-print-area, #reports-print-area * {
+    visibility: visible;
+  }
+  #reports-print-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+}
