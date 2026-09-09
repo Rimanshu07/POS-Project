@@ -15,8 +15,10 @@ const ERROR_MESSAGES = {
   INTERNAL_SERVER_ERROR: 'Something went wrong on our end. Please try again later.'
 };
 
+const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+
 const api = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_URL,
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json'

@@ -161,7 +161,7 @@ export const Categories = () => {
           <p className="text-gray-500 mt-1">Manage product categories</p>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+        <div className="grid w-full grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
           <div className="flex items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
             <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white">
               <Tags className="h-6 w-6" />
@@ -329,7 +329,7 @@ export const Categories = () => {
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="fixed inset-0 bg-gray-900/50" onClick={() => !bulkMutation.isPending && setIsBulkModalOpen(false)} />
-          <div className="relative w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
+          <div className="relative max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white p-4 shadow-xl sm:p-6">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-bold text-gray-900">Bulk Upload Categories</h2>
               <button onClick={() => setIsBulkModalOpen(false)} disabled={bulkMutation.isPending}><XIcon className="h-5 w-5 text-gray-500" /></button>

@@ -183,7 +183,11 @@ const getOrderInvoice = async (id) => {
     throw new AppError('Order not found', 'ORDER_NOT_FOUND', 404);
   }
 
-  const payment = order.payments?.[0] || null;
+  const payments = (order.payments || []).map((payment) => ({
+    method: payment.method,
+    amount: parseFloat(payment.amount).toFixed(2),
+    status: payment.status
+  }));
 
   return {
     invoice_number: order.invoice_no || order.order_number,
@@ -209,13 +213,8 @@ const getOrderInvoice = async (id) => {
     tax_percent: parseFloat(order.tax_percent).toFixed(2),
     tax_amount: parseFloat(order.tax_amount).toFixed(2),
     total_amount: parseFloat(order.total_amount).toFixed(2),
-    payment: payment
-      ? {
-          method: payment.method,
-          amount: parseFloat(payment.amount).toFixed(2),
-          status: payment.status
-        }
-      : null
+    payments,
+    payment: payments[0] || null
   };
 };
 

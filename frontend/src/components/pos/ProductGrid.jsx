@@ -74,7 +74,7 @@ export const ProductGrid = ({ products, isLoading }) => {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
         {[...Array(14)].map((_, i) => (
           <div key={i} className="animate-pulse flex flex-col bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden p-3">
             <div className="space-y-2">
@@ -98,18 +98,18 @@ export const ProductGrid = ({ products, isLoading }) => {
 
   return (
     <>
-      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 min-[420px]:grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7 gap-2 sm:gap-3">
         {products.map((product) => (
           <button
             key={product.id}
             onClick={() => setPopupProduct(product)}
-            className="flex flex-col text-left bg-[#fffdf9] rounded-2xl card-shadow border border-[#e8e1d5] p-3 hover:border-[#8cb99d] hover:bg-[#eef7f0] transition-modern focus:outline-none focus:ring-2 focus:ring-[#0e6b4f]"
+            className="flex min-h-[82px] flex-col text-left bg-[#fffdf9] rounded-xl sm:rounded-2xl card-shadow border border-[#e8e1d5] p-2 sm:p-3 hover:border-[#8cb99d] hover:bg-[#eef7f0] transition-modern focus:outline-none focus:ring-2 focus:ring-[#0e6b4f]"
           >
             <div className="w-full">
-              <h3 className="text-sm font-semibold text-[#26332d] line-clamp-2 min-h-[40px] leading-snug">
+              <h3 className="text-xs sm:text-sm font-semibold text-[#26332d] line-clamp-2 min-h-[32px] sm:min-h-[40px] leading-snug">
                 {product.name}
               </h3>
-              <p className="mt-1 text-sm font-bold text-[#0e6b4f]">
+              <p className="mt-1 text-xs sm:text-sm font-bold text-[#0e6b4f]">
                 ₹{parseFloat(product.price).toFixed(2)}
               </p>
             </div>
@@ -127,5 +127,3 @@ export const ProductGrid = ({ products, isLoading }) => {
     </>
   );
 };
-
-

@@ -161,11 +161,11 @@ export const Products = () => {
           />
         </div>
         
-        <div className="flex gap-4">
+        <div className="grid grid-cols-1 gap-3 sm:flex sm:gap-4">
           <select
             value={selectedCategory}
             onChange={(e) => { setSelectedCategory(e.target.value); setPage(1); }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white min-w-[150px]"
+            className="w-full min-w-0 rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 sm:min-w-[150px]"
           >
             <option value="">All Categories</option>
             {categories.map(c => (
@@ -176,7 +176,7 @@ export const Products = () => {
           <select
             value={statusFilter}
             onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+            className="w-full rounded-lg border border-gray-300 bg-white px-4 py-2 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500 sm:w-auto"
           >
             <option value="ALL">All Status</option>
             <option value="ACTIVE">Active</option>

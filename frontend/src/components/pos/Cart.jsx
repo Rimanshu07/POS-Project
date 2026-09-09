@@ -20,7 +20,7 @@ export const Cart = () => {
     <div className="flex flex-col h-full bg-[#FAF9F6] font-[Inter,sans-serif]">
 
       {/* Header */}
-      <div className="flex-none px-5 py-4 border-b border-[#E5E2D9] flex items-center justify-between">
+      <div className="flex-none border-b border-[#E5E2D9] px-3 py-2.5 sm:px-5 sm:py-4 flex items-center justify-between">
         <span className="text-[15px] font-semibold text-[#24231F] tracking-tight">Current order</span>
         {items.length > 0 && (
           <span className="text-xs font-medium text-[#78766D] tabular-nums">{itemCount} item{itemCount !== 1 ? 's' : ''}</span>
@@ -28,7 +28,7 @@ export const Cart = () => {
       </div>
 
       {/* Item list */}
-      <div className="flex-1 overflow-y-auto px-5">
+      <div className="min-h-0 flex-1 overflow-y-auto px-3 sm:px-5">
         {items.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-center">
             <ShoppingCart className="w-10 h-10 text-[#D9D6CB] mb-3" strokeWidth={1.5} />
@@ -39,11 +39,11 @@ export const Cart = () => {
           items.map((item, idx) => (
             <div
               key={item.product_id}
-              className={`flex items-center gap-3 py-3.5 ${idx !== items.length - 1 ? 'border-b border-[#EDEAE1]' : ''}`}
+              className={`flex min-w-0 items-center gap-2 py-2.5 sm:gap-3 sm:py-3.5 ${idx !== items.length - 1 ? 'border-b border-[#EDEAE1]' : ''}`}
             >
               {/* Name + price row */}
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-[#24231F] truncate">{item.name}</p>
+                <p className="truncate text-xs font-medium text-[#24231F] sm:text-sm">{item.name}</p>
                 <div className="flex items-center gap-1 mt-1">
                   <span className="text-xs text-[#A3A096]">₹</span>
                   <input
@@ -84,7 +84,7 @@ export const Cart = () => {
               </div>
 
               {/* Line total */}
-              <span className="text-sm font-semibold text-[#24231F] tabular-nums w-16 text-right flex-none">
+              <span className="w-14 flex-none text-right text-xs font-semibold text-[#24231F] tabular-nums sm:w-16 sm:text-sm">
                 ₹{(parseFloat(item.price) * item.quantity).toFixed(2)}
               </span>
 
@@ -102,32 +102,32 @@ export const Cart = () => {
       </div>
 
       {/* Summary + actions */}
-      <div className="flex-none border-t border-[#E5E2D9] bg-white px-5 pt-4 pb-5">
-        <div className="flex justify-between text-sm text-[#78766D] mb-1.5">
+      <div className="flex-none shrink-0 border-t border-[#E5E2D9] bg-white px-3 pt-2.5 pb-2.5 sm:px-5 sm:pt-4 sm:pb-5">
+        <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
           <span>Subtotal</span>
           <span className="tabular-nums text-[#24231F]">₹{subtotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between text-sm text-[#78766D] mb-3">
+        <div className="flex justify-between text-xs text-[#78766D] mb-2 sm:text-sm sm:mb-3">
           <span>Tax</span>
           <span className="tabular-nums text-[#24231F]">₹{taxAmount.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between items-baseline pt-3 border-t border-dashed border-[#E5E2D9] mb-4">
+        <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-[#E5E2D9] mb-2.5 sm:pt-3 sm:mb-4">
           <span className="text-sm font-semibold text-[#24231F]">Total</span>
-          <span className="text-2xl font-bold text-[#24231F] tabular-nums">₹{total.toFixed(2)}</span>
+          <span className="text-xl font-bold text-[#24231F] tabular-nums sm:text-2xl">₹{total.toFixed(2)}</span>
         </div>
 
         <div className="flex gap-2.5">
           <button
             onClick={clearCart}
             disabled={items.length === 0}
-            className="flex-1 py-3 rounded-lg text-sm font-semibold text-[#A23B2E] border border-[#E9D9D5] hover:bg-[#FBF1EF] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-transparent transition-all focus:outline-none focus:ring-2 focus:ring-[#A23B2E]/30"
+            className="min-h-11 flex-1 rounded-lg border border-[#E9D9D5] py-2.5 text-xs font-semibold text-[#A23B2E] hover:bg-[#FBF1EF] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent transition-all focus:outline-none focus:ring-2 focus:ring-[#A23B2E]/30 sm:py-3 sm:text-sm"
           >
             Cancel order
           </button>
           <button
             onClick={() => setIsCheckoutModalOpen(true)}
             disabled={items.length === 0}
-            className="flex-[1.5] py-3 rounded-lg text-sm font-semibold text-white bg-[#0E6B4F] hover:bg-[#0B5A42] active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed transition-all focus:outline-none focus:ring-2 focus:ring-[#0E6B4F]/30"
+            className="min-h-11 flex-[1.5] rounded-lg bg-[#0E6B4F] py-2.5 text-xs font-semibold text-white hover:bg-[#0B5A42] active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 transition-all focus:outline-none focus:ring-2 focus:ring-[#0E6B4F]/30 sm:py-3 sm:text-sm"
           >
             Checkout ₹{total.toFixed(2)}
           </button>

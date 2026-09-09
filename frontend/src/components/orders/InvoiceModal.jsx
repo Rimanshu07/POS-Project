@@ -37,17 +37,17 @@ export const InvoiceModal = ({ isOpen, onClose, orderId }) => {
 
       <div
         id="invoice-modal-print-root"
-        className="fixed inset-0 z-50 flex items-start justify-center p-4 bg-gray-900 bg-opacity-60 sm:p-8 overflow-y-auto !m-0"
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-gray-900 bg-opacity-60 p-2 !m-0 sm:p-8"
       >
         {/* Modal card */}
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl my-8 overflow-hidden flex flex-col print:shadow-none print:rounded-none print:m-0">
+        <div className="my-2 flex max-h-[calc(100dvh-1rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl sm:my-8 sm:max-h-[calc(100dvh-4rem)] print:m-0 print:rounded-none print:shadow-none">
 
           {/* Header — hidden when printing */}
-          <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 print:hidden flex-none">
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-3">
+          <div className="flex flex-none flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-3 py-3 print:hidden sm:px-6 sm:py-4">
+            <div className="min-w-0">
+              <h2 className="flex flex-wrap items-center gap-2 text-lg font-bold text-gray-900">
                 Invoice
-                <div className="flex gap-1 ml-4 bg-gray-200 p-1 rounded-lg">
+                <div className="ml-0 flex gap-1 rounded-lg bg-gray-200 p-1 sm:ml-4">
                   <button 
                     onClick={() => setPreviewType('thermal')}
                     className={`text-xs px-3 py-1.5 rounded-md transition-colors ${previewType === 'thermal' ? 'bg-white text-indigo-700 shadow-sm font-bold' : 'text-gray-600 hover:bg-gray-300'}`}
@@ -88,7 +88,7 @@ export const InvoiceModal = ({ isOpen, onClose, orderId }) => {
           </div>
 
           {/* Content */}
-          <div className="flex-1 overflow-y-auto bg-gray-100 print:bg-white print:overflow-visible">
+          <div className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-gray-100 print:overflow-visible print:bg-white">
             {isLoading ? (
               <div className="p-12 flex flex-col items-center justify-center print:hidden">
                 <div className="animate-spin rounded-full h-10 w-10 border-4 border-indigo-600 border-t-transparent mb-4" />
@@ -101,7 +101,7 @@ export const InvoiceModal = ({ isOpen, onClose, orderId }) => {
                 <p className="text-sm text-gray-500 mt-1">Please try again later.</p>
               </div>
             ) : (
-              <div className="p-6 print:p-0">
+              <div className="p-2 sm:p-6 print:p-0">
                 <div className="bg-white rounded-xl shadow-sm print:shadow-none print:rounded-none">
                   {previewType === 'thermal' ? <Invoice invoice={invoice} /> : <InvoiceA4 invoice={invoice} />}
                 </div>

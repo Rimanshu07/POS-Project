@@ -8,6 +8,7 @@
   body {
     @apply bg-[#f7f5f0] text-[#26332d] antialiased;
     font-family: 'DM Sans', sans-serif;
+    overflow-x: hidden;
   }
   
   /* Smooth scroll and selection */
@@ -31,6 +32,52 @@
 
   .restaurant-heading {
     font-family: 'Playfair Display', serif;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+}
+
+@media (max-width: 640px) {
+  .invoice-a4-document {
+    padding: 16px !important;
+    border-radius: 0 !important;
+  }
+
+  .invoice-a4-header {
+    flex-direction: column !important;
+    gap: 18px !important;
+    margin-bottom: 20px !important;
+  }
+
+  .invoice-a4-header > div:last-child {
+    width: 100%;
+    text-align: left !important;
+  }
+
+  .invoice-a4-totals {
+    flex-direction: column !important;
+    gap: 16px !important;
+  }
+
+  .invoice-a4-totals > * {
+    width: 100% !important;
+    max-width: none !important;
+    min-width: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .invoice-a4-document table {
+    width: 100% !important;
+    table-layout: fixed;
+    font-size: 11px !important;
+  }
+
+  .invoice-a4-document th,
+  .invoice-a4-document td {
+    padding: 7px 5px !important;
+    overflow-wrap: anywhere;
   }
 }
 

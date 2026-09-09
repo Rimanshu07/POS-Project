@@ -77,7 +77,7 @@ export const Dashboard = () => {
           </h1>
         </div>
 
-        <div className="flex items-center gap-3">
+        {/* <div className="flex items-center gap-3">
           <div className="relative">
             <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
               <Calendar className="w-4 h-4 text-gray-500" />
@@ -93,7 +93,7 @@ export const Dashboard = () => {
               <option value="this_month">This Month</option>
             </select>
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* 8 Cards Grid */}

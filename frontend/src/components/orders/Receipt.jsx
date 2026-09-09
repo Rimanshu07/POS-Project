@@ -5,7 +5,7 @@ import React from 'react';
 export const Receipt = ({ order }) => {
   if (!order) return null;
 
-  const payment = order.payments?.[0];
+  const payments = order.payments || [];
 
   const formatDate = (dateStr) => {
     const d = new Date(dateStr);
@@ -158,9 +158,13 @@ export const Receipt = ({ order }) => {
 
       <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
 
-      {payment && (
+      {payments.length > 0 && (
         <div style={{ fontSize: "11px", marginBottom: "4px" }}>
-          Paid via {payment.method}
+          {payments.map((payment) => (
+            <div key={payment.id || payment.method}>
+              Paid via {payment.method}: ₹{parseFloat(payment.amount || 0).toFixed(2)}
+            </div>
+          ))}
         </div>
       )}
 

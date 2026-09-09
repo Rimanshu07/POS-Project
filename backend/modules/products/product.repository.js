@@ -24,7 +24,7 @@ const findAll = async ({ skip, take, search, category_id, is_active }) => {
           select: { id: true, name: true, slug: true }
         }
       },
-      orderBy: { created_at: 'desc' }
+      orderBy: { name: 'asc' }
     }),
     prisma.product.count({ where })
   ]);

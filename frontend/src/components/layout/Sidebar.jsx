@@ -10,9 +10,8 @@ import {
   ShoppingBag
 } from 'lucide-react';
 import clsx from 'clsx';
-import { useState } from 'react';
 
-export const Sidebar = () => {
+export const Sidebar = ({ isOpen, onClose }) => {
   const { user } = useAuth();
   const location = useLocation();
 
@@ -30,10 +29,21 @@ export const Sidebar = () => {
   const allowedNav = navigation.filter(item => item.roles.includes(user?.role));
 
   return (
-    <div className="flex h-full w-64 flex-col bg-[#163b2d] border-r border-[#285743] shadow-xl transition-modern">
+    <>
+      {isOpen && (
+        <button
+          className="fixed inset-0 z-40 bg-[#102f24]/60 lg:hidden"
+          onClick={onClose}
+          aria-label="Close navigation menu"
+        />
+      )}
+      <div className={clsx(
+        'fixed inset-y-0 left-0 z-50 flex h-full w-72 flex-col bg-[#163b2d] border-r border-[#285743] shadow-xl transition-transform duration-200 lg:static lg:z-auto lg:w-64 lg:translate-x-0',
+        isOpen ? 'translate-x-0' : '-translate-x-full'
+      )}>
       {/* Sidebar Logo Header */}
       <div className="flex h-20 shrink-0 items-center px-5 border-b border-[#285743]">
-        <NavLink to="/dashboard" className="flex items-center text-white tracking-wide hover:text-[#f2c879] transition-colors">
+        <NavLink to="/dashboard" onClick={onClose} className="flex items-center text-white tracking-wide hover:text-[#f2c879] transition-colors">
           <span className="bg-[#f2c879] text-[#163b2d] p-2 rounded-xl mr-3 text-sm font-bold shadow-sm">S</span>
           <span>
             <span className="block text-lg font-bold restaurant-heading">Sherwoods</span>
@@ -51,6 +61,7 @@ export const Sidebar = () => {
               <NavLink
                 key={item.name}
                 to={item.href}
+                onClick={onClose}
                 className={clsx(
                   isActivePath
                     ? 'bg-[#f2c879] text-[#163b2d] font-semibold shadow-sm border-[#f2c879]'
@@ -70,8 +81,7 @@ export const Sidebar = () => {
             );
           })}
         </nav>
-      </div>
-      
+        </div>
       {/* Sidebar Footer */}
       <div className="px-5 py-4 border-t border-[#285743] bg-[#102f24]">
         <div className="flex items-center">
@@ -85,5 +95,6 @@ export const Sidebar = () => {
         </div>
       </div>
     </div>
+    </>
   );
 };

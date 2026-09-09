@@ -1,39 +1,53 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useProducts } from '../hooks/useProducts';
+import { useInfiniteProducts } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
-import { useAuth } from '../hooks/useAuth';
 import { ProductGrid } from '../components/pos/ProductGrid';
 import { CategoryFilter } from '../components/pos/CategoryFilter';
 import { Cart } from '../components/pos/Cart';
-import { Search, AlertCircle, ShoppingCart, LayoutDashboard, Home, Package, Tags, BarChart3, History, ChevronDown } from 'lucide-react';
-import { useEffect } from 'react';
+import { Search, AlertCircle, ShoppingCart, Home, Package, Tags, BarChart3, History, ChevronDown } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
+import { Navbar } from '../components/layout/Navbar';
+import { Sidebar } from '../components/layout/Sidebar';
 
 export const POS = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: productsData, isLoading: isLoadingProducts, error: errorProducts } = useProducts({ is_active: 'true' });
-  const { data: categoriesData, isLoading: isLoadingCategories, error: errorCategories } = useCategories({ is_active: 'true' });
-  
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState(null);
-  
-  // For live clock in navbar
   const [currentTime, setCurrentTime] = useState(new Date());
+  const productParams = {
+    is_active: 'true',
+    ...(searchQuery.trim() && { search: searchQuery.trim() }),
+    ...(selectedCategory !== null && { category_id: selectedCategory })
+  };
+  const {
+    data: productsData,
+    isLoading: isLoadingProducts,
+    isFetchingNextPage,
+    hasNextPage,
+    fetchNextPage,
+    error: errorProducts
+  } = useInfiniteProducts(productParams);
+  const { data: categoriesData, isLoading: isLoadingCategories, error: errorCategories } = useCategories({ is_active: 'true', limit: 1000 });
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const filteredProducts = useMemo(() => {
-    const products = productsData?.products || [];
-    if (!products.length) return [];
-    
-    return products.filter((product) => {
-      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === null || product.category_id === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
-  }, [productsData, searchQuery, selectedCategory]);
+  
+  const products = useMemo(
+    () => productsData?.pages.flatMap((page) => page.products || []) || [],
+    [productsData]
+  );
+
+  const handleProductScroll = (event) => {
+    const element = event.currentTarget;
+    const nearBottom = element.scrollHeight - element.scrollTop - element.clientHeight < 240;
+    if (nearBottom && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
 
   if (errorProducts || errorCategories) {
     return (
@@ -48,56 +62,44 @@ export const POS = () => {
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-[#f7f5f0] overflow-hidden">
-      {/* POS Top Navbar */}
-      <div className="h-16 bg-[#163b2d] flex items-center justify-between px-4 text-white shrink-0 shadow-md z-30">
-        <div className="flex items-center gap-6 h-full">
-          <div className="flex items-center gap-2 mr-4">
-            <ShoppingCart className="w-5 h-5 text-[#f2c879]" />
-            <span className="font-bold tracking-wider hidden sm:block restaurant-heading">Sherwoods POS</span>
-          </div>
-          
-          <div className="hidden md:flex items-center h-full">
-            <button onClick={() => navigate('/dashboard')} className="px-3 h-full flex items-center hover:bg-[#285743] transition-colors border-l border-[#285743]" title="Dashboard">
-              <Home className="w-5 h-5" />
-            </button>
-            <button onClick={() => navigate('/products')} className="px-3 h-full flex items-center hover:bg-[#285743] transition-colors border-l border-[#285743]" title="Products">
-              <Package className="w-5 h-5" />
-            </button>
-            <button onClick={() => navigate('/categories')} className="px-3 h-full flex items-center hover:bg-[#285743] transition-colors border-l border-[#285743]" title="Categories">
-              <Tags className="w-5 h-5" />
-            </button>
-            <button onClick={() => navigate('/orders')} className="px-3 h-full flex items-center hover:bg-[#285743] transition-colors border-l border-r border-[#285743]" title="All Sales">
-              <BarChart3 className="w-5 h-5" />
-            </button>
-            <button onClick={() => navigate('/orders')} className="px-3 h-full flex items-center hover:bg-[#285743] transition-colors border-r border-[#285743]" title="Recent Orders">
-              <History className="w-5 h-5" />
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 text-xs font-medium">
-          <div className="hidden lg:block text-right">
-            <div className="text-gray-300">
-              {currentTime.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </div>
-            <div>
-              {currentTime.toLocaleTimeString('en-US')}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 bg-[#285743] py-1.5 px-3 rounded-full cursor-pointer hover:bg-[#346e51] transition-colors">
-            <div className="w-6 h-6 bg-[#f2c879] rounded-full flex items-center justify-center text-[#163b2d] font-bold">
-              {user?.name?.charAt(0) || 'A'}
-            </div>
-            <span>{user?.name || 'Admin'}</span>
-            <ChevronDown className="w-4 h-4 text-gray-400" />
-          </div>
-        </div>
+    <div className="flex h-[100dvh] w-full min-w-0 overflow-hidden bg-[#f7f5f0]">
+      <div className="lg:hidden">
+        <Sidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
       </div>
-
-      <div className="flex flex-1 flex-col lg:flex-row overflow-hidden">
+      <div className="min-w-0 flex flex-1 flex-col overflow-hidden">
+        <div className="lg:hidden">
+          <Navbar onMenuClick={() => setIsSidebarOpen(true)} />
+        </div>
+        <div className="hidden h-16 shrink-0 items-center justify-between bg-[#163b2d] px-4 text-white shadow-md lg:flex">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <ShoppingCart className="h-5 w-5 text-[#f2c879]" />
+              <span className="font-bold tracking-wider restaurant-heading">Sherwoods POS</span>
+            </div>
+            <div className="flex h-16 items-center">
+              <button onClick={() => navigate('/dashboard')} className="px-3 h-full hover:bg-[#285743]" title="Dashboard"><Home className="h-5 w-5" /></button>
+              <button onClick={() => navigate('/products')} className="px-3 h-full hover:bg-[#285743]" title="Products"><Package className="h-5 w-5" /></button>
+              <button onClick={() => navigate('/categories')} className="px-3 h-full hover:bg-[#285743]" title="Categories"><Tags className="h-5 w-5" /></button>
+              <button onClick={() => navigate('/reports')} className="px-3 h-full hover:bg-[#285743]" title="Reports"><BarChart3 className="h-5 w-5" /></button>
+              <button onClick={() => navigate('/orders')} className="px-3 h-full hover:bg-[#285743]" title="Orders"><History className="h-5 w-5" /></button>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-xs font-medium">
+            <div className="text-right">
+              <div className="text-gray-300">{currentTime.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+              <div>{currentTime.toLocaleTimeString('en-US')}</div>
+            </div>
+            <div className="flex items-center gap-2 rounded-full bg-[#285743] px-3 py-1.5">
+              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f2c879] font-bold text-[#163b2d]">{user?.name?.charAt(0) || 'A'}</div>
+              <span>{user?.name || 'Admin'}</span>
+              <ChevronDown className="h-4 w-4 text-gray-400" />
+            </div>
+          </div>
+        </div>
+        <div className="min-h-0 min-w-0 flex flex-1 flex-col lg:flex-row overflow-hidden">
         {/* Left side: Cart (30%) */}
-        <div className="w-full lg:w-96 flex-none bg-[#fffdf9] shadow-[4px_0_15px_-3px_rgba(0,0,0,0.08)] z-20 h-full max-h-full overflow-hidden flex flex-col border-r border-[#e8e1d5]">
-        <div className="bg-[#0e6b4f] text-white p-3 font-semibold flex items-center gap-2">
+        <div className="min-h-0 h-[48%] w-full flex-none overflow-hidden border-r border-[#e8e1d5] bg-[#fffdf9] shadow-[4px_0_15px_-3px_rgba(0,0,0,0.08)] z-20 flex flex-col lg:h-full lg:w-96">
+        <div className="flex flex-none items-center gap-2 bg-[#0e6b4f] p-2.5 font-semibold text-white sm:p-3">
           <ShoppingCart className="w-5 h-5" />
           <span>Current Sale</span>
         </div>
@@ -107,12 +109,12 @@ export const POS = () => {
       </div>
 
       {/* Right side: Products (70%) */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#f7f5f0]">
-        <div className="p-4 sm:p-6 bg-[#fffdf9] border-b border-[#e8e1d5] shadow-sm z-10 flex-none space-y-4">
+      <div className="min-h-0 min-w-0 flex-1 flex flex-col bg-[#f7f5f0]">
+        <div className="p-2.5 sm:p-6 bg-[#fffdf9] border-b border-[#e8e1d5] shadow-sm z-10 flex-none space-y-2 sm:space-y-4">
           <div className="flex flex-col sm:flex-row gap-4">
             {/* Product Search */}
             <div className="flex-1">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Search Product</label>
+              <label className="block text-[11px] font-medium text-gray-500 mb-1 sm:text-xs">Search Product</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Search className="h-4 w-4 text-gray-400" />
@@ -128,10 +130,10 @@ export const POS = () => {
             </div>
           </div>
           
-          <div className="pt-2">
+          <div className="pt-1 sm:pt-2">
             {!isLoadingCategories && (
               <div className="space-y-1">
-                <label className="block text-xs font-medium text-gray-500">Categories</label>
+                <label className="block text-[11px] font-medium text-gray-500 sm:text-xs">Categories</label>
                 <CategoryFilter 
                   categories={[...(categoriesData?.categories || [])].sort((a, b) => a.name.localeCompare(b.name))} 
                   selectedCategory={selectedCategory} 
@@ -142,11 +144,18 @@ export const POS = () => {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <ProductGrid products={filteredProducts} isLoading={isLoadingProducts} />
+        <div
+          className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6"
+          onScroll={handleProductScroll}
+        >
+          <ProductGrid products={products} isLoading={isLoadingProducts} />
+          {isFetchingNextPage && (
+            <p className="py-5 text-center text-sm font-medium text-[#0e6b4f]">Loading more products...</p>
+          )}
+        </div>
         </div>
       </div>
     </div>
-  </div>
+    </div>
   );
 };

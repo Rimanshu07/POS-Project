@@ -98,7 +98,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={!isSubmitting ? onClose : undefined} />
       
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all sm:my-8">
+      <div className="relative my-2 max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl transition-all sm:my-8 sm:max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
           <h3 className="text-lg font-bold text-gray-900">
             {product ? 'Edit Product' : 'Add New Product'}
@@ -108,7 +108,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(submitHandler)} className="p-6">
+        <form onSubmit={handleSubmit(submitHandler)} className="p-4 sm:p-6">
           <div className="space-y-4">
             {/* Name */}
             <div>
@@ -130,7 +130,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
             </div>
 
             {/* MRP */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelCls}>MRP (Price) <span className="text-red-500">*</span></label>
                 <div className="relative">
@@ -142,7 +142,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
             </div>
 
             {/* GST fields */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className={labelCls}>GST Type</label>
                 <select {...register('gst_type')} className={inputCls}>
@@ -175,7 +175,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button type="button" onClick={onClose} disabled={isSubmitting}
               className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50">
               Cancel

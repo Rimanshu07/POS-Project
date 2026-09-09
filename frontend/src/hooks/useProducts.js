@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getProducts, getProductById, createProduct, updateProduct, deleteProduct } from '../services/api/products';
 
 export const useProducts = (params = {}) => {
@@ -7,6 +7,24 @@ export const useProducts = (params = {}) => {
     queryFn: () => getProducts(params),
     keepPreviousData: true,
     staleTime: 5 * 60 * 1000,
+  });
+};
+
+export const useInfiniteProducts = (params = {}) => {
+  return useInfiniteQuery({
+    queryKey: ['products-infinite', params],
+    queryFn: ({ pageParam = 1 }) => getProducts({
+      ...params,
+      page: pageParam,
+      limit: params.limit || 24
+    }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      const currentPage = lastPage?.meta?.page || 1;
+      const totalPages = lastPage?.meta?.totalPages || 1;
+      return currentPage < totalPages ? currentPage + 1 : undefined;
+    },
+    staleTime: 5 * 60 * 1000
   });
 };
 

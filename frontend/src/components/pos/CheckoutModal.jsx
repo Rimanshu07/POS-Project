@@ -222,10 +222,10 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
   const remainingAmount = Math.max(0, parseFloat(total) - totalPaid);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-50">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 p-2 sm:p-4">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-5xl flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-h-[95vh]">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-[#2c3e50] text-white flex-none">
+        <div className="flex flex-none items-center justify-between border-b border-gray-100 bg-[#2c3e50] px-4 py-3 text-white sm:px-6 sm:py-4">
           <h2 className="text-lg font-bold">Checkout</h2>
           <button onClick={onClose} className="text-gray-300 hover:text-white focus:outline-none">
             <X className="w-5 h-5" />
@@ -233,7 +233,7 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         </div>
 
         {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-5">
           {errorMsg && (
             <div
               role="alert"
@@ -320,10 +320,7 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                             const value = e.target.value;
                             setPaymentAmounts(prev => ({
                               ...prev,
-                              [m]: value,
-                              ...(m !== 'UPI' && m === 'CASH' && value
-                                ? { UPI: Math.max(0, parseFloat(total) - (parseFloat(value) || 0)).toFixed(2) }
-                                : {})
+                              [m]: value
                             }));
                             setErrorMsg(null);
                             setErrorField(null);

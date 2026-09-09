@@ -68,7 +68,7 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={!isSubmitting ? onClose : undefined} />
       
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden transform transition-all sm:my-8">
+      <div className="relative my-2 max-h-[calc(100dvh-1rem)] w-full max-w-md overflow-y-auto rounded-xl bg-white shadow-xl transition-all sm:my-8 sm:max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
             {category ? 'Edit Category' : 'Add New Category'}
@@ -82,7 +82,7 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(submitHandler)} className="p-6">
+        <form onSubmit={handleSubmit(submitHandler)} className="p-4 sm:p-6">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -110,7 +110,7 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
             </div>
           </div>
 
-          <div className="mt-6 flex justify-end space-x-3">
+          <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
             <button
               type="button"
               onClick={onClose}

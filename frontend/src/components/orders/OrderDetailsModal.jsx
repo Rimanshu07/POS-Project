@@ -25,7 +25,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
   // conflicts with the main page don't cause a blank page.
   const handlePrint = () => {
     if (!order) return;
-    const payment = order.payments?.[0];
+    const payments = order.payments || [];
     const receiptHtml = `
       <!DOCTYPE html><html><head>
         <title>Receipt - ${order.order_number}</title>
@@ -70,7 +70,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
         <div class="row"><span>Tax:</span><span>₹${parseFloat(order.tax_amount).toFixed(2)}</span></div>
         <div class="row total-row"><span>TOTAL:</span><span>₹${parseFloat(order.total_amount).toFixed(2)}</span></div>
         <div class="divider"></div>
-        <div class="row"><span>Payment (${payment?.method || 'N/A'}):</span><span>₹${parseFloat(payment?.amount || order.total_amount).toFixed(2)}</span></div>
+        ${payments.length > 0 ? payments.map(payment => `<div class="row"><span>Payment (${payment.method}):</span><span>₹${parseFloat(payment.amount).toFixed(2)}</span></div>`).join('') : '<div class="row"><span>Payment:</span><span>N/A</span></div>'}
         <div class="footer"><b>*** THANK YOU ***</b><br/>Please visit again</div>
       </body></html>`;
     const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -81,28 +81,28 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-gray-900 bg-opacity-50 sm:p-6 !m-0 print:bg-white print:p-0">
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh] print:max-w-none print:shadow-none print:h-auto print:max-h-none print:rounded-none">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 p-2 sm:p-6 !m-0 print:bg-white print:p-0">
+      <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-xl sm:max-h-[90vh] print:h-auto print:max-h-none print:max-w-none print:rounded-none print:shadow-none">
         
         {/* Header - Hidden when printing */}
-        <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 print:hidden">
-          <h2 className="text-lg font-bold text-gray-900">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 bg-gray-50 px-3 py-3 print:hidden sm:px-6 sm:py-4">
+          <h2 className="min-w-0 text-base font-bold text-gray-900 sm:text-lg">
             Order Details {order ? `- ${order.order_number}` : ''}
           </h2>
-          <div className="flex items-center space-x-2">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             {order && (
               <>
                 <button
                   onClick={() => setIsInvoiceOpen(true)}
                   id="order-details-invoice-btn"
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-colors shadow-sm"
+                  className="inline-flex items-center rounded-md border border-transparent bg-indigo-600 px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-indigo-700 focus:outline-none sm:px-3 sm:text-sm"
                 >
                   <FileText className="w-4 h-4 mr-1.5" />
                   Invoice
                 </button>
                 <button 
                   onClick={handlePrint}
-                  className="inline-flex items-center px-3 py-1.5 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200 focus:outline-none transition-colors"
+                  className="inline-flex items-center rounded-md border border-transparent bg-indigo-100 px-2.5 py-1.5 text-xs font-medium text-indigo-700 transition-colors hover:bg-indigo-200 focus:outline-none sm:px-3 sm:text-sm"
                 >
                   <Printer className="w-4 h-4 mr-1.5" />
                   Print Receipt
@@ -116,7 +116,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
         </div>
 
         {/* Content area */}
-        <div className="flex-1 overflow-y-auto p-6 bg-white print:p-0 print:overflow-visible">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-white p-3 print:overflow-visible print:p-0 sm:p-6">
           {isLoading ? (
             <div className="animate-pulse space-y-6 print:hidden">
               <div className="h-20 bg-gray-200 rounded-xl"></div>
@@ -195,17 +195,19 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">Payment Details</h3>
                     {order.payments && order.payments.length > 0 ? (
                       <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Method:</span>
-                          <span className="font-medium text-gray-900">{order.payments[0].method}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Amount Paid:</span>
-                          <span className="font-medium text-gray-900">₹{parseFloat(order.payments[0].amount).toFixed(2)}</span>
+                        {order.payments.map((payment) => (
+                          <div key={payment.id} className="flex justify-between">
+                            <span className="text-gray-500">{payment.method}:</span>
+                            <span className="font-medium text-gray-900">₹{parseFloat(payment.amount).toFixed(2)}</span>
+                          </div>
+                        ))}
+                        <div className="flex justify-between border-t border-gray-200 pt-2">
+                          <span className="font-semibold text-gray-700">Total Paid:</span>
+                          <span className="font-semibold text-gray-900">₹{order.payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
                           <span className="text-gray-500">Status:</span>
-                          <span className="font-medium text-green-600">{order.payments[0].status}</span>
+                          <span className="font-medium text-green-600">{order.payments.every((payment) => payment.status === 'PAID') ? 'PAID' : 'PENDING'}</span>
                         </div>
                       </div>
                     ) : (

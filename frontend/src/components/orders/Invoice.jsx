@@ -25,6 +25,7 @@ export const Invoice = ({ invoice }) => {
   // Round off
   const grandTotalRounded = Math.round(totalAmount);
   const roundOff = (grandTotalRounded - totalAmount).toFixed(2);
+  const payments = invoice.payments || (invoice.payment ? [invoice.payment] : []);
 
   const LINE = "─".repeat(42);
 
@@ -191,9 +192,11 @@ export const Invoice = ({ invoice }) => {
       <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
 
       {/* Payment method */}
-      {invoice.payment && (
+      {payments.length > 0 && (
         <div style={{ fontSize: "11px", marginBottom: "4px" }}>
-          Paid via {invoice.payment.method}
+          {payments.map((payment) => (
+            <div key={payment.method}>Paid via {payment.method}: ₹{formatCurrency(payment.amount)}</div>
+          ))}
         </div>
       )}
 

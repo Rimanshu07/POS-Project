@@ -32,15 +32,16 @@ export const InvoiceA4 = ({ invoice }) => {
   const grandTotalRounded = Math.round(totalAmount);
   const roundOff = grandTotalRounded - totalAmount;
   const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
+  const payments = invoice.payments || (invoice.payment ? [invoice.payment] : []);
 
   return (
     <div
       id="invoice-print-area"
-      className="bg-white text-gray-900 mx-auto border border-gray-200 shadow-sm rounded-lg overflow-hidden"
-      style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", maxWidth: "794px", padding: "40px" }}
+      className="invoice-a4-document mx-auto overflow-hidden rounded-lg border border-gray-200 bg-white text-gray-900 shadow-sm"
+      style={{ fontFamily: "'Inter', 'Segoe UI', sans-serif", width: "100%", maxWidth: "794px", boxSizing: "border-box", padding: "40px" }}
     >
       {/* Header */}
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
+      <div className="invoice-a4-header" style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "32px" }}>
         <div>
           <h1 style={{ fontSize: "22px", fontWeight: "800", color: "#111827", margin: "0 0 4px 0" }}>
             Sherwoods Restaurant
@@ -133,9 +134,9 @@ export const InvoiceA4 = ({ invoice }) => {
       </table>
 
       {/* Totals + Payment */}
-      <div style={{ display: "flex", justifyContent: "flex-end", gap: "32px" }}>
+      <div className="invoice-a4-totals" style={{ display: "flex", justifyContent: "flex-end", gap: "32px" }}>
         {/* Payment box */}
-        {invoice.payment && (
+        {payments.length > 0 && (
           <div
             style={{
               flex: "1",
@@ -151,23 +152,25 @@ export const InvoiceA4 = ({ invoice }) => {
             <p style={{ fontWeight: "700", color: "#374151", margin: "0 0 10px", textTransform: "uppercase", fontSize: "11px", letterSpacing: "0.5px" }}>
               Payment Details
             </p>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span style={{ color: "#6B7280" }}>Method:</span>
-              <span style={{ fontWeight: "600", color: "#111827" }}>{invoice.payment.method}</span>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
-              <span style={{ color: "#6B7280" }}>Amount Paid:</span>
-              <span style={{ fontWeight: "600", color: "#111827" }}>{formatCurrency(invoice.payment.amount)}</span>
+            {payments.map((payment) => (
+              <div key={payment.method} style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px" }}>
+                <span style={{ color: "#6B7280" }}>{payment.method}:</span>
+                <span style={{ fontWeight: "600", color: "#111827" }}>{formatCurrency(payment.amount)}</span>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "6px", borderTop: "1px solid #E5E7EB", paddingTop: "6px" }}>
+              <span style={{ color: "#6B7280" }}>Total Paid:</span>
+              <span style={{ fontWeight: "600", color: "#111827" }}>{formatCurrency(payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0))}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between" }}>
               <span style={{ color: "#6B7280" }}>Status:</span>
-              <span style={{ fontWeight: "600", color: "#16A34A" }}>{invoice.payment.status || "Completed"}</span>
+              <span style={{ fontWeight: "600", color: "#16A34A" }}>{payments.every((payment) => payment.status === "PAID") ? "PAID" : "PENDING"}</span>
             </div>
           </div>
         )}
 
         {/* Amounts summary */}
-        <div style={{ minWidth: "260px", fontSize: "13px" }}>
+        <div className="invoice-a4-summary" style={{ minWidth: "260px", fontSize: "13px" }}>
           <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
             <span style={{ color: "#6B7280" }}>Total Qty: {totalQty} &nbsp;&nbsp; Sub Total</span>
             <span style={{ color: "#374151" }}>{subtotal.toFixed(2)}</span>

@@ -112,7 +112,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user: editUser, isSubmitt
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-0">
       <div className="fixed inset-0 bg-gray-900/50 backdrop-blur-sm" onClick={!isSubmitting ? onClose : undefined} />
       
-      <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden transform transition-all sm:my-8">
+      <div className="relative my-2 max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-xl bg-white shadow-xl transition-all sm:my-8 sm:max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
           <h3 className="text-lg font-semibold text-gray-900">
             {editUser ? 'Edit User' : 'Add New User'}
@@ -126,7 +126,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user: editUser, isSubmitt
           </button>
         </div>
 
-        <form onSubmit={handleSubmit(submitHandler)} className="p-6">
+        <form onSubmit={handleSubmit(submitHandler)} className="p-4 sm:p-6">
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -141,7 +141,7 @@ export const UserModal = ({ isOpen, onClose, onSubmit, user: editUser, isSubmitt
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Username <span className="text-red-500">*</span>

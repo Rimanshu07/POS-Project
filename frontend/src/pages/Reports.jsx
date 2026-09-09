@@ -146,23 +146,23 @@ export const Reports = () => {
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-12">
-      <div className="flex justify-between items-center print:hidden">
+      <div className="flex flex-col items-start justify-between gap-4 print:hidden sm:flex-row sm:items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Reports</h1>
           <p className="mt-1 text-sm text-gray-500">View and analyze your business performance</p>
         </div>
         {activeTab === 'all' && (
-          <div className="flex gap-2">
+          <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
             <button
               onClick={handleExportExcel}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-lg shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none transition-modern"
+              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-green-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-modern hover:bg-green-700 focus:outline-none"
             >
               <Download className="w-4 h-4 mr-2" />
               Export Excel
             </button>
             <button
               onClick={handlePrint}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-bold rounded-lg shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none transition-modern"
+              className="inline-flex items-center justify-center rounded-lg border border-transparent bg-indigo-600 px-4 py-2 text-sm font-bold text-white shadow-sm transition-modern hover:bg-indigo-700 focus:outline-none"
             >
               <Printer className="w-4 h-4 mr-2" />
               Print Report
@@ -172,8 +172,8 @@ export const Reports = () => {
       </div>
 
       <div className="print:hidden">
-        <div className="border-b border-gray-200 mb-6">
-          <nav className="-mb-px flex space-x-8">
+        <div className="mb-6 overflow-x-auto border-b border-gray-200">
+          <nav className="-mb-px flex min-w-max space-x-6">
             {TABS.map((tab) => {
               const Icon = tab.icon;
               return (
