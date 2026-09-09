@@ -23,6 +23,8 @@ export const useCartStore = create((set, get) => ({
           product_id: product.id,
           name: product.name,
           price: product.price,
+          gst_type: product.gst_type || 'GST',
+          gst_percentage: product.gst_percentage || 0,
           quantity: 1
         }
       ]

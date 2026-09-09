@@ -36,9 +36,18 @@ const getDailySalesReport = async (query) => {
   return await reportsRepository.getDailySalesReport(parseInt(year), parseInt(month));
 };
 
+const getDailyProductDetails = async (query) => {
+  return await reportsRepository.getDailyProductDetails(query.date);
+};
+
 const getMonthlySalesReport = async (query) => {
   const { year } = query;
   return await reportsRepository.getMonthlySalesReport(parseInt(year));
+};
+
+const getMonthlyProductDetails = async (query) => {
+  const { year, month } = query;
+  return await reportsRepository.getMonthlyProductDetails(parseInt(year), parseInt(month));
 };
 
 module.exports = {
@@ -48,5 +57,7 @@ module.exports = {
   getPaymentReport,
   getTaxReport,
   getDailySalesReport,
-  getMonthlySalesReport
+  getDailyProductDetails,
+  getMonthlySalesReport,
+  getMonthlyProductDetails
 };

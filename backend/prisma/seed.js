@@ -62,7 +62,6 @@ async function main() {
       create: {
         name,
         slug,
-        display_order: i,
       },
     });
     categories.push(cat);

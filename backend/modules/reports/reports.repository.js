@@ -1,4 +1,4 @@
-const { PrismaClient, Prisma } = require('@prisma/client');
+const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 const getSalesReport = async (startDate, endDate, groupBy = 'date') => {
@@ -149,6 +149,7 @@ const getDailySalesReport = async (year, month) => {
     const dateStr = row.date instanceof Date ? row.date.toISOString().split('T')[0] : row.date;
     salesMap.set(dateStr, {
       ...row,
+      date: dateStr,
       total_orders: Number(row.total_orders),
       total_grand_total: Number(row.total_grand_total),
       total_discount: Number(row.total_discount),
@@ -173,6 +174,44 @@ const getDailySalesReport = async (year, month) => {
   return calendarData;
 };
 
+const getDailyProductDetails = async (date) => {
+  const startDate = new Date(`${date}T00:00:00`);
+  const endDate = new Date(`${date}T23:59:59.999`);
+
+  const result = await prisma.$queryRaw`
+    SELECT
+      p.id AS product_id,
+      p.name AS product_name,
+      c.name AS category_name,
+      COUNT(DISTINCT o.id) AS order_count,
+      COALESCE(AVG(oi.unit_price), 0) AS avg_price,
+      COALESCE(SUM(oi.quantity), 0) AS total_quantity,
+      COALESCE(AVG(oi.gst_percentage), 0) AS tax_rate,
+      COALESCE(SUM(oi.gst_amount), 0) AS tax_amount,
+      COALESCE(SUM(oi.line_total + oi.gst_amount), 0) AS total_amount
+    FROM \`order_items\` oi
+    JOIN \`orders\` o ON oi.order_id = o.id
+    JOIN \`products\` p ON oi.product_id = p.id
+    LEFT JOIN \`categories\` c ON p.category_id = c.id
+    WHERE LOWER(o.status) = 'completed'
+      AND o.created_at >= ${startDate}
+      AND o.created_at <= ${endDate}
+    GROUP BY p.id, p.name, c.name
+    ORDER BY total_amount DESC
+  `;
+
+  return result.map(row => ({
+    ...row,
+    product_id: Number(row.product_id),
+    order_count: Number(row.order_count),
+    avg_price: Number(row.avg_price),
+    total_quantity: Number(row.total_quantity),
+    tax_rate: Number(row.tax_rate),
+    tax_amount: Number(row.tax_amount),
+    total_amount: Number(row.total_amount)
+  }));
+};
+
 const getMonthlySalesReport = async (year) => {
   const startDate = new Date(year, 0, 1);
   const endDate = new Date(year, 11, 31, 23, 59, 59);
@@ -194,10 +233,12 @@ const getMonthlySalesReport = async (year) => {
     ORDER BY sale_month ASC
   `;
 
+  // MySQL MONTH() returns BigInt — must convert to Number before using as Map key
   const salesMap = new Map();
   result.forEach(row => {
-    salesMap.set(row.sale_month, {
-      ...row,
+    const monthKey = Number(row.sale_month);
+    salesMap.set(monthKey, {
+      sale_month: monthKey,
       total_orders: Number(row.total_orders),
       total_items_sold: Number(row.total_items_sold),
       total_grand_total: Number(row.total_grand_total),
@@ -208,13 +249,48 @@ const getMonthlySalesReport = async (year) => {
 
   const monthlyData = [];
   for (let month = 1; month <= 12; month++) {
-    monthlyData.push({
-      sale_month: month,
-      ...(salesMap.get(month) || {})
-    });
+    monthlyData.push(
+      salesMap.get(month) || {
+        sale_month: month,
+        total_orders: 0,
+        total_items_sold: 0,
+        total_grand_total: 0,
+        total_tax: 0,
+        total_discount: 0
+      }
+    );
   }
 
   return monthlyData;
+};
+
+const getMonthlyProductDetails = async (year, month) => {
+  const result = await prisma.$queryRaw`
+    SELECT 
+      c.name AS category_name,
+      p.name AS product_name,
+      COUNT(DISTINCT o.id) AS order_count,
+      COALESCE(SUM(oi.quantity), 0) AS total_quantity,
+      COALESCE(AVG(oi.unit_price), 0) AS avg_price,
+      COALESCE(SUM(oi.line_total), 0) AS total_amount
+    FROM \`orders\` o
+    JOIN \`order_items\` oi ON oi.order_id = o.id
+    JOIN \`products\` p ON oi.product_id = p.id
+    JOIN \`categories\` c ON p.category_id = c.id
+    WHERE LOWER(o.status) = 'completed'
+      AND YEAR(o.created_at) = ${year}
+      AND MONTH(o.created_at) = ${month}
+    GROUP BY c.name, p.name
+    ORDER BY total_amount DESC
+  `;
+
+  return result.map(r => ({
+    ...r,
+    order_count: Number(r.order_count),
+    total_quantity: Number(r.total_quantity),
+    avg_price: Number(r.avg_price),
+    total_amount: Number(r.total_amount)
+  }));
 };
 
 module.exports = {
@@ -224,5 +300,7 @@ module.exports = {
   getPaymentReport,
   getTaxReport,
   getDailySalesReport,
-  getMonthlySalesReport
+  getDailyProductDetails,
+  getMonthlySalesReport,
+  getMonthlyProductDetails
 };

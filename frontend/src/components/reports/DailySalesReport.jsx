@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { ChevronLeft, ChevronRight, Download } from 'lucide-react';
-import { useDailySalesReport } from '../../hooks/useReports';
+import { ChevronLeft, ChevronRight, Download, X } from 'lucide-react';
+import { useDailyProductDetails, useDailySalesReport } from '../../hooks/useReports';
 import * as XLSX from 'xlsx';
 
 const MONTH_NAMES = [
@@ -17,8 +17,13 @@ export const DailySalesReport = () => {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth() + 1);
+  const [selectedDate, setSelectedDate] = useState('');
 
   const { data: calendarData, isLoading } = useDailySalesReport({ year, month });
+  const { data: productDetails = [], isLoading: isDetailsLoading } = useDailyProductDetails(
+    { date: selectedDate },
+    Boolean(selectedDate)
+  );
 
   const calendar = useMemo(() => {
     if (!calendarData) return [];
@@ -115,6 +120,23 @@ export const DailySalesReport = () => {
     XLSX.writeFile(wb, `Daily_Sales_${MONTH_NAMES[month - 1]}_${year}.xlsx`);
   };
 
+  const handleDownloadDetails = () => {
+    if (!productDetails.length) return;
+    const rows = productDetails.map(product => ({
+      'Product Name': product.product_name,
+      'Category': product.category_name || 'Uncategorized',
+      'Average Price': Number(product.avg_price || 0).toFixed(2),
+      'Quantity': Number(product.total_quantity || 0).toFixed(2),
+      'GST Rate': `${Number(product.tax_rate || 0).toFixed(2)}%`,
+      'GST Amount': Number(product.tax_amount || 0).toFixed(2),
+      'Total Amount': Number(product.total_amount || 0).toFixed(2)
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Daily Details');
+    XLSX.writeFile(workbook, `Daily_Sales_Details_${selectedDate}.xlsx`);
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex justify-between items-center">
@@ -172,6 +194,7 @@ export const DailySalesReport = () => {
                     className={`border border-gray-200 p-2 min-h-[120px] relative transition-all hover:shadow-md ${
                       hasSales ? 'bg-green-50 cursor-pointer hover:bg-green-100' : 'bg-white'
                     }`}
+                    onClick={() => hasSales && setSelectedDate(day.date)}
                   >
                     <div className="font-bold text-sm mb-1">{day.day}</div>
                     {hasSales && (
@@ -205,6 +228,67 @@ export const DailySalesReport = () => {
           </div>
         </div>
       </div>
+
+      {selectedDate && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-6xl overflow-hidden rounded-xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between border-b border-gray-200 bg-[#2c3e50] px-5 py-4 text-white">
+              <div>
+                <h3 className="text-lg font-bold">Daily Sales Details</h3>
+                <p className="text-sm text-gray-200">{new Date(`${selectedDate}T00:00:00`).toLocaleDateString('en-IN', {
+                  weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+                })}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleDownloadDetails}
+                  disabled={isDetailsLoading || !productDetails.length}
+                  className="inline-flex items-center rounded-lg bg-green-700 px-3 py-2 text-sm font-semibold hover:bg-green-800 disabled:opacity-50"
+                >
+                  <Download className="mr-2 h-4 w-4" /> Download Excel
+                </button>
+                <button onClick={() => setSelectedDate('')} className="rounded-lg p-2 hover:bg-white/10" aria-label="Close details">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+            <div className="max-h-[calc(90vh-88px)] overflow-auto p-5">
+              {isDetailsLoading ? (
+                <div className="py-12 text-center text-sm text-gray-500">Loading daily sales details...</div>
+              ) : productDetails.length === 0 ? (
+                <div className="py-12 text-center text-sm text-gray-500">No product sales found for this date.</div>
+              ) : (
+                <div className="overflow-x-auto rounded-lg border border-gray-200">
+                  <table className="min-w-full divide-y divide-gray-200 text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {['Product Name', 'Category', 'Average Price', 'Quantity', 'GST Rate', 'GST Amount', 'Total Amount'].map(header => (
+                          <th key={header} className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-700 ${
+                            ['Average Price', 'Quantity', 'GST Rate', 'GST Amount', 'Total Amount'].includes(header) ? 'text-center' : 'text-left'
+                          }`}>{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 bg-white">
+                      {productDetails.map(product => (
+                        <tr key={product.product_id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-semibold text-gray-900">{product.product_name}</td>
+                          <td className="px-4 py-3 text-gray-600">{product.category_name || 'Uncategorized'}</td>
+                          <td className="px-4 py-3 text-center text-gray-600">{formatCurrency(product.avg_price)}</td>
+                          <td className="px-4 py-3 text-center text-gray-600">{Number(product.total_quantity || 0).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-center text-gray-600">{Number(product.tax_rate || 0).toFixed(2)}%</td>
+                          <td className="px-4 py-3 text-right font-semibold text-green-700">{formatCurrency(product.tax_amount)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-green-700">{formatCurrency(product.total_amount)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

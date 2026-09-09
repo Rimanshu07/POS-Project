@@ -44,7 +44,7 @@ const validateCategory = async (categoryId) => {
 const createProduct = async (data) => {
   await validateCategory(data.category_id);
 
-  const allowedFields = ['category_id', 'name', 'description', 'price', 'image_url', 'is_active'];
+  const allowedFields = ['category_id', 'name', 'description', 'price', 'gst_type', 'gst_percentage', 'image_url', 'is_active'];
   const cleanData = {};
   allowedFields.forEach(field => {
     if (data[field] !== undefined) {
@@ -69,7 +69,7 @@ const updateProduct = async (id, data) => {
     await validateCategory(data.category_id);
   }
 
-  const allowedFields = ['category_id', 'name', 'description', 'price', 'image_url', 'is_active'];
+  const allowedFields = ['category_id', 'name', 'description', 'price', 'gst_type', 'gst_percentage', 'image_url', 'is_active'];
   const cleanData = {};
   allowedFields.forEach(field => {
     if (data[field] !== undefined) {

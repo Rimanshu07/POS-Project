@@ -6,8 +6,6 @@ import { X } from 'lucide-react';
 
 const categorySchema = z.object({
   name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters'),
-  slug: z.string().min(1, 'Slug is required').regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Slug must be lowercase alphanumeric and can contain hyphens'),
-  display_order: z.number({ invalid_type_error: "Must be a number" }).int().min(0, 'Must be 0 or greater').default(0),
   is_active: z.boolean().default(true)
 });
 
@@ -21,8 +19,6 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
     resolver: zodResolver(categorySchema),
     defaultValues: {
       name: '',
-      slug: '',
-      display_order: 0,
       is_active: true
     }
   });
@@ -32,15 +28,11 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
       if (category) {
         reset({
           name: category.name,
-          slug: category.slug,
-          display_order: category.display_order,
           is_active: category.is_active
         });
       } else {
         reset({
           name: '',
-          slug: '',
-          display_order: 0,
           is_active: true
         });
       }
@@ -50,10 +42,7 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
   if (!isOpen) return null;
 
   const submitHandler = (data) => {
-    const payload = {
-      ...data,
-      slug: data.slug.trim().toLowerCase(),
-    };
+    const payload = data;
 
     if (category) {
       const changedData = {};
@@ -106,32 +95,6 @@ export const CategoryModal = ({ isOpen, onClose, onSubmit, category, isSubmittin
                 placeholder="Category name"
               />
               {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Slug <span className="text-red-500">*</span>
-              </label>
-              <input
-                {...register('slug')}
-                type="text"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 lowercase"
-                placeholder="e.g. fast-food"
-              />
-              {errors.slug && <p className="mt-1 text-sm text-red-600">{errors.slug.message}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Display Order
-              </label>
-              <input
-                {...register('display_order', { valueAsNumber: true })}
-                type="number"
-                min="0"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
-              />
-              {errors.display_order && <p className="mt-1 text-sm text-red-600">{errors.display_order.message}</p>}
             </div>
 
             <div className="flex items-center">

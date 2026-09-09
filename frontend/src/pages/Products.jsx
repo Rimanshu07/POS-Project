@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Edit2, Check, X as XIcon, Package } from 'lucide-react';
+import { Plus, Search, Edit2, Check, X as XIcon, Package, Tags } from 'lucide-react';
 import { useProducts, useCreateProduct, useUpdateProduct, useDeleteProduct } from '../hooks/useProducts';
 import { useCategories } from '../hooks/useCategories';
 import { useAuth } from '../hooks/useAuth';
@@ -35,10 +35,15 @@ export const Products = () => {
   };
 
   const { data: productsData, isLoading, isError } = useProducts(queryParams);
+  const { data: productCountData } = useProducts({ limit: 1 });
   const { data: categoriesData } = useCategories({ is_active: 'true' });
+  const { data: categoryCountData } = useCategories({ limit: 1 });
 
   const products = productsData?.products || [];
-  const meta = productsData?.meta || { total: 0, pages: 1 };
+  const meta = productsData?.meta || { total: 0, totalPages: 1 };
+  const totalPages = meta.totalPages ?? meta.pages ?? 1;
+  const totalProductCount = productCountData?.meta?.total ?? productsData?.meta?.total ?? 0;
+  const totalCategoryCount = categoryCountData?.meta?.total ?? 0;
   const categories = categoriesData?.categories || [];
 
   // Modals state
@@ -111,6 +116,27 @@ export const Products = () => {
           </h1>
           <p className="text-gray-500 mt-1">Manage your product catalog</p>
         </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="flex items-center gap-4 rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Package className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Total Products</p>
+              <p className="mt-1 text-2xl font-extrabold text-gray-900">{totalProductCount}</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white">
+              <Tags className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">Total Categories</p>
+              <p className="mt-1 text-2xl font-extrabold text-gray-900">{totalCategoryCount}</p>
+            </div>
+          </div>
+        </div>
         {canManage && (
           <button
             onClick={() => handleOpenModal()}
@@ -168,6 +194,7 @@ export const Products = () => {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Product Info</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">GST</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
                 {canManage && (
                   <th className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -177,19 +204,19 @@ export const Products = () => {
             <tbody className="bg-white divide-y divide-gray-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan={canManage ? 6 : 5} className="px-6 py-8 text-center text-gray-500">
                     Loading products...
                   </td>
                 </tr>
               ) : isError ? (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} className="px-6 py-8 text-center text-red-500">
+                  <td colSpan={canManage ? 6 : 5} className="px-6 py-8 text-center text-red-500">
                     Failed to load products
                   </td>
                 </tr>
               ) : products.length === 0 ? (
                 <tr>
-                  <td colSpan={canManage ? 5 : 4} className="px-6 py-12 text-center">
+                  <td colSpan={canManage ? 6 : 5} className="px-6 py-12 text-center">
                     <Package className="mx-auto h-12 w-12 text-gray-300" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No products found</h3>
                     <p className="mt-1 text-sm text-gray-500">
@@ -223,6 +250,9 @@ export const Products = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-indigo-600">
                       ₹{Number(product.price).toFixed(2)}
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {product.gst_type || 'GST'} {Number(product.gst_percentage || 0).toFixed(2)}%
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {product.is_active ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -253,7 +283,7 @@ export const Products = () => {
         </div>
 
         {/* Pagination */}
-        {meta.pages > 1 && (
+        {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
             <p className="text-sm text-gray-700">
               Showing <span className="font-medium">{(page - 1) * limit + 1}</span> to{' '}
@@ -269,8 +299,8 @@ export const Products = () => {
                 Previous
               </button>
               <button
-                onClick={() => setPage(p => Math.min(meta.pages, p + 1))}
-                disabled={page === meta.pages}
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-gray-100 bg-white"
               >
                 Next

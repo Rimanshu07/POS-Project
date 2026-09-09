@@ -10,7 +10,7 @@ const productSchema = z.object({
   category_id: z.string().min(1, 'Category is required'),
   price: z.string().min(1, 'MRP is required').regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid price'),
   gst_type: z.enum(['GST', 'VAT']).default('GST'),
-  markup_percent: z.string().optional(),
+  gst_percentage: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Must be a valid percentage').refine(value => parseFloat(value) <= 100, 'GST must be between 0 and 100'),
   description: z.string().optional(),
   is_active: z.boolean().default(true)
 });
@@ -31,7 +31,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
       category_id: '',
       price: '',
       gst_type: 'GST',
-      markup_percent: '',
+      gst_percentage: '0',
       description: '',
       is_active: true
     }
@@ -45,7 +45,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
           category_id: product.category_id.toString(),
           price: product.price,
           gst_type: product.gst_type || 'GST',
-          markup_percent: product.markup_percent?.toString() || '',
+          gst_percentage: product.gst_percentage?.toString() || '0',
           description: product.description || '',
           is_active: product.is_active
         });
@@ -55,7 +55,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
           category_id: '',
           price: '',
           gst_type: 'GST',
-          markup_percent: '',
+          gst_percentage: '0',
           description: '',
           is_active: true
         });
@@ -72,7 +72,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
     };
 
     if (product) {
-      const allowedFields = ['category_id', 'name', 'description', 'price', 'image_url', 'is_active'];
+      const allowedFields = ['category_id', 'name', 'description', 'price', 'gst_type', 'gst_percentage', 'image_url', 'is_active'];
       const changedData = {};
       let hasChanges = false;
       Object.keys(payload).forEach(key => {
@@ -129,7 +129,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
               {errors.category_id && <p className={errorCls}>{errors.category_id.message}</p>}
             </div>
 
-            {/* MRP and GST Type */}
+            {/* MRP */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className={labelCls}>MRP (Price) <span className="text-red-500">*</span></label>
@@ -139,23 +139,25 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
                 </div>
                 {errors.price && <p className={errorCls}>{errors.price.message}</p>}
               </div>
+            </div>
+
+            {/* GST fields */}
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className={labelCls}>Tax Type</label>
+                <label className={labelCls}>GST Type</label>
                 <select {...register('gst_type')} className={inputCls}>
                   <option value="GST">GST</option>
                   <option value="VAT">VAT</option>
                 </select>
               </div>
-            </div>
-
-            {/* Markup */}
-            <div>
-              <label className={labelCls}>Markup Percentage (%)</label>
-              <div className="relative">
-                <input {...register('markup_percent')} type="number" min="0" max="1000" step="0.01" className={`${inputCls} pr-8`} placeholder="e.g. 20" />
+              <div>
+                <label className={labelCls}>GST Percentage (%)</label>
+                <div className="relative">
+                <input {...register('gst_percentage')} type="number" min="0" max="100" step="0.01" className={`${inputCls} pr-8`} placeholder="e.g. 5" />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                </div>
+                {errors.gst_percentage && <p className={errorCls}>{errors.gst_percentage.message}</p>}
               </div>
-              <p className="mt-1 text-xs text-gray-400">Optional — for internal tracking only</p>
             </div>
 
             {/* Description */}

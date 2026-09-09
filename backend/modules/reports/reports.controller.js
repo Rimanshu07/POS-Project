@@ -31,8 +31,18 @@ const getDailySalesReport = asyncHandler(async (req, res) => {
   res.status(200).json({ success: true, data });
 });
 
+const getDailyProductDetails = asyncHandler(async (req, res) => {
+  const products = await reportsService.getDailyProductDetails(req.query);
+  res.status(200).json({ success: true, data: products });
+});
+
 const getMonthlySalesReport = asyncHandler(async (req, res) => {
   const data = await reportsService.getMonthlySalesReport(req.query);
+  res.status(200).json({ success: true, data });
+});
+
+const getMonthlyProductDetails = asyncHandler(async (req, res) => {
+  const data = await reportsService.getMonthlyProductDetails(req.query);
   res.status(200).json({ success: true, data });
 });
 
@@ -43,5 +53,7 @@ module.exports = {
   getPaymentReport,
   getTaxReport,
   getDailySalesReport,
-  getMonthlySalesReport
+  getDailyProductDetails,
+  getMonthlySalesReport,
+  getMonthlyProductDetails
 };

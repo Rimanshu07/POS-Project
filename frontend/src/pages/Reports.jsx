@@ -46,7 +46,6 @@ export const Reports = () => {
   const [filters, setFilters] = useState({
     start_date: '',
     end_date: '',
-    reference_no: '',
     invoice_no: '',
     payment_status: ''
   });
@@ -79,7 +78,6 @@ export const Reports = () => {
     setFilters({
       start_date: '',
       end_date: '',
-      reference_no: '',
       invoice_no: '',
       payment_status: ''
     });
@@ -95,19 +93,17 @@ export const Reports = () => {
     const exportData = ordersData.orders.map(order => {
       const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
       const totalAmount = order.total_amount || 0;
-      const paidAmount = order.payments?.[0]?.amount || 0;
-      const balance = totalAmount - paidAmount;
+      const amount = order.subtotal || 0;
+      const gstAmount = order.tax_amount || 0;
       const paymentStatus = order.payments?.[0]?.status || 'PENDING';
       
       return {
         'Date': formatDate(order.created_at),
-        'Reference No': order.reference_no || '-',
         'Invoice No': order.invoice_no || '-',
-        'Customer': order.customer_name || 'Walk-in Customer',
         'Items': totalItems,
         'Total': totalAmount.toFixed(2),
-        'Paid': paidAmount.toFixed(2),
-        'Balance': balance.toFixed(2),
+        'Amount': amount.toFixed(2),
+        'GST': gstAmount.toFixed(2),
         'Status': order.status,
         'Payment': paymentStatus
       };
@@ -224,16 +220,6 @@ export const Reports = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-1">Reference No</label>
-                  <input
-                    type="text"
-                    value={filters.reference_no}
-                    onChange={(e) => handleFilterChange('reference_no', e.target.value)}
-                    placeholder="Search..."
-                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                  />
-                </div>
-                <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Invoice No</label>
                   <input
                     type="text"
@@ -290,23 +276,20 @@ export const Reports = () => {
                   <thead className="bg-gray-50">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Reference No</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Invoice No</th>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Customer</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Items</th>
                       <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Paid</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Balance</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Amount + GST</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Payment</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {isLoading ? (
-                      <tr><td colSpan="10" className="px-4 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
+                      <tr><td colSpan="7" className="px-4 py-8 text-center text-sm text-gray-500">Loading...</td></tr>
                     ) : !ordersData?.orders || ordersData.orders.length === 0 ? (
                       <tr>
-                        <td colSpan="10" className="px-4 py-8 text-center">
+                        <td colSpan="7" className="px-4 py-8 text-center">
                           <div className="text-gray-400">
                             <div className="text-4xl mb-2">📋</div>
                             <p className="text-sm">No sales found</p>
@@ -318,8 +301,8 @@ export const Reports = () => {
                       ordersData.orders.map((order) => {
                         const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
                         const totalAmount = order.total_amount || 0;
-                        const paidAmount = order.payments?.[0]?.amount || 0;
-                        const balance = totalAmount - paidAmount;
+                        const amount = order.subtotal || 0;
+                        const gstAmount = order.tax_amount || 0;
                         const paymentStatus = order.payments?.[0]?.status || 'PENDING';
                         
                         return (
@@ -328,14 +311,12 @@ export const Reports = () => {
                               <div>{formatDate(order.created_at)}</div>
                               <small className="text-gray-500">{formatTime(order.created_at)}</small>
                             </td>
-                            <td className="px-4 py-3 text-sm font-medium text-gray-900">{order.reference_no || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{order.invoice_no || '-'}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600">{order.customer_name || 'Walk-in Customer'}</td>
+                            <td className="px-4 py-3 text-sm text-gray-600">{order.invoice_no || order.order_number || '-'}</td>
                             <td className="px-4 py-3 text-sm text-gray-600 text-center">{totalItems}</td>
                             <td className="px-4 py-3 text-sm font-bold text-green-700 text-right">{formatCurrency(totalAmount)}</td>
-                            <td className="px-4 py-3 text-sm text-gray-600 text-right">{formatCurrency(paidAmount)}</td>
-                            <td className={`px-4 py-3 text-sm font-medium text-right ${balance > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                              {formatCurrency(balance)}
+                            <td className="px-4 py-3 text-sm text-right">
+                              <div className="font-medium text-gray-900">Amount: {formatCurrency(amount)}</div>
+                              <div className="text-xs text-indigo-600">GST: {formatCurrency(gstAmount)}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">

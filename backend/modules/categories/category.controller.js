@@ -62,10 +62,23 @@ const deleteCategory = asyncHandler(async (req, res) => {
   });
 });
 
+const bulkCreateCategories = asyncHandler(async (req, res) => {
+  const result = await categoryService.bulkCreateCategories(req.body.categories);
+  res.status(201).json({
+    success: true,
+    data: {
+      categories: result.created,
+      count: result.created.length,
+      skipped: result.skipped
+    }
+  });
+});
+
 module.exports = {
   listCategories,
   getCategory,
   createCategory,
   updateCategory,
-  deleteCategory
+  deleteCategory,
+  bulkCreateCategories
 };

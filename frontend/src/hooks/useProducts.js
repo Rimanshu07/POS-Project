@@ -20,37 +20,40 @@ export const useProduct = (id) => {
 
 export const useCreateProduct = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: createProduct,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['products']);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useUpdateProduct = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: updateProduct,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['products']);
       queryClient.invalidateQueries(['product', variables.id]);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useDeleteProduct = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: deleteProduct,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['products']);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };

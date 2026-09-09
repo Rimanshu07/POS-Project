@@ -36,11 +36,12 @@ const getCategoryById = async (id, userRole) => {
 
 const createCategory = async (data) => {
   try {
-    const existing = await categoryRepo.findBySlug(data.slug);
+    const slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    const existing = await categoryRepo.findBySlug(slug);
     if (existing) {
       throw new AppError('Category slug must be unique', 'VALIDATION_ERROR', 400);
     }
-    return await categoryRepo.create(data);
+    return await categoryRepo.create({ ...data, slug });
   } catch (error) {
     if (error.code === 'P2002' && error.meta?.target?.includes('slug')) {
       throw new AppError('Category slug must be unique', 'VALIDATION_ERROR', 400);
@@ -55,15 +56,12 @@ const updateCategory = async (id, data) => {
     throw new AppError('Category not found', 'CATEGORY_NOT_FOUND', 404);
   }
 
-  if (data.slug && data.slug !== existing.slug) {
-    const slugCheck = await categoryRepo.findBySlug(data.slug);
-    if (slugCheck && slugCheck.id !== id) {
-      throw new AppError('Category slug must be unique', 'VALIDATION_ERROR', 400);
-    }
-  }
-
   try {
-    return await categoryRepo.update(id, data);
+    const updateData = { ...data };
+    if (data.name) {
+      updateData.slug = data.name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    }
+    return await categoryRepo.update(id, updateData);
   } catch (error) {
     if (error.code === 'P2002' && error.meta?.target?.includes('slug')) {
       throw new AppError('Category slug must be unique', 'VALIDATION_ERROR', 400);
@@ -82,10 +80,51 @@ const deleteCategory = async (id) => {
   return { success: true };
 };
 
+const bulkCreateCategories = async (rows) => {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    throw new AppError('At least one category is required', 'VALIDATION_ERROR', 400);
+  }
+
+  const seen = new Set();
+  const categories = rows.map((row, index) => {
+    const name = String(row?.name || '').trim();
+    if (!name) {
+      throw new AppError(`Category name is required on row ${index + 2}`, 'VALIDATION_ERROR', 400);
+    }
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    if (seen.has(slug)) {
+      throw new AppError(`Duplicate category "${name}" in upload`, 'VALIDATION_ERROR', 400);
+    }
+    seen.add(slug);
+    return { name, slug, is_active: row.is_active !== false };
+  });
+
+  const existing = await Promise.all(categories.map(category => categoryRepo.findBySlug(category.slug)));
+  const skipped = [];
+  const newCategories = categories.filter((category, index) => {
+    if (existing[index]) {
+      skipped.push(`${category.name} (already exists)`);
+      return false;
+    }
+    return true;
+  });
+
+  try {
+    const created = newCategories.length ? await categoryRepo.createMany(newCategories) : [];
+    return { created, skipped };
+  } catch (error) {
+    if (error.code === 'P2002') {
+      throw new AppError('One or more category names already exist', 'VALIDATION_ERROR', 400);
+    }
+    throw error;
+  }
+};
+
 module.exports = {
   getCategories,
   getCategoryById,
   createCategory,
   updateCategory,
   deleteCategory
+  ,bulkCreateCategories
 };

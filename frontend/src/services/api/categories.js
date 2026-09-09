@@ -19,3 +19,7 @@ export const updateCategory = async ({ id, data }) => {
 export const deleteCategory = async (id) => {
   return await api.delete(`/categories/${id}`);
 };
+
+export const bulkCreateCategories = async (categories) => {
+  return await api.post('/categories/bulk', { categories });
+};

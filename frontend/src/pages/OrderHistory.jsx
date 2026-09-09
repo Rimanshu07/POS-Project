@@ -57,7 +57,7 @@ export const OrderHistory = () => {
           </div>
           <input
             type="text"
-            placeholder="Search by Order Number (e.g. ORD-2026...)"
+            placeholder="Search by Invoice No (e.g. ORD-2026...)"
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow shadow-sm"
@@ -100,7 +100,7 @@ export const OrderHistory = () => {
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Order Number
+                  Invoice No
                 </th>
                 <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                   Date & Time
@@ -139,7 +139,7 @@ export const OrderHistory = () => {
                 orders.map((order) => (
                   <tr key={order.id} className="hover:bg-indigo-50/30 transition-modern">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-semibold text-gray-900">{order.order_number}</div>
+                      <div className="text-sm font-semibold text-gray-900">{order.invoice_no || order.order_number}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-500">

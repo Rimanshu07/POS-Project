@@ -10,16 +10,14 @@ const createOrderSchema = z.object({
         quantity: z.number().int().positive('Quantity must be at least 1')
       })
     ).min(1, 'Order must contain at least one item'),
-    tax_percent: z.string()
-      .regex(/^\d+(\.\d{1,2})?$/, 'Tax percent must be a valid number with up to 2 decimal places')
-      .optional()
-      .default('18.00'),
-    payment: z.object({
+    payment: z.union([
+      z.object({
       method: z.enum(['CASH', 'CARD', 'UPI', 'NEFT', 'RTGS', 'OTHERS']),
+      amount: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
       amount_tendered: z.string()
         .regex(/^\d+(\.\d{1,2})?$/, 'Amount tendered must be a valid positive number with up to 2 decimal places')
         .optional()
-    }).refine(data => {
+      }).refine(data => {
       if (data.method === 'CASH') {
         return !!data.amount_tendered;
       }
@@ -27,7 +25,12 @@ const createOrderSchema = z.object({
     }, {
       message: "amount_tendered is required for CASH payment",
       path: ['amount_tendered']
-    })
+      }),
+      z.array(z.object({
+        method: z.enum(['CASH', 'CARD', 'UPI', 'NEFT', 'RTGS', 'OTHERS']),
+        amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Payment amount must be valid')
+      })).min(1)
+    ])
   }).strict('Unknown fields are not allowed. Discount is not supported in V1.')
 });
 

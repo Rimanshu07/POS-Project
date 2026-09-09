@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getCategories, getCategoryById, createCategory, updateCategory, deleteCategory } from '../services/api/categories';
+import { getCategories, getCategoryById, createCategory, updateCategory, deleteCategory, bulkCreateCategories } from '../services/api/categories';
 
 export const useCategories = (params = {}) => {
   return useQuery({
@@ -20,37 +20,53 @@ export const useCategory = (id) => {
 
 export const useCreateCategory = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: createCategory,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['categories']);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useUpdateCategory = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: updateCategory,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['categories']);
       queryClient.invalidateQueries(['category', variables.id]);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useDeleteCategory = (options = {}) => {
   const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: deleteCategory,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries(['categories']);
-      if (options.onSuccess) options.onSuccess(data, variables, context);
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
+  });
+};
+
+export const useBulkCreateCategories = (options = {}) => {
+  const queryClient = useQueryClient();
+  const { onSuccess, ...restOptions } = options;
+  return useMutation({
+    mutationFn: bulkCreateCategories,
+    onSuccess: (data, variables, context) => {
+      queryClient.invalidateQueries({ queryKey: ['categories'] });
+      if (onSuccess) onSuccess(data, variables, context);
+    },
+    ...restOptions
   });
 };

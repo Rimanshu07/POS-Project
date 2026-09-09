@@ -50,36 +50,49 @@ const createOrder = async (orderData, userId) => {
           const lineTotal = dbProduct.price.mul(quantity);
           subtotal = subtotal.add(lineTotal);
 
+          const gstPercentage = new Prisma.Decimal(dbProduct.gst_percentage || 0);
+          const gstAmount = lineTotal.mul(gstPercentage).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
           orderItems.push({
             product_id: dbProduct.id,
             quantity: item.quantity,
             unit_price: dbProduct.price, // Snapshot of current price
             discount_amount: new Prisma.Decimal(0), // No discounts in V1 Phase 6
-            line_total: lineTotal
+            line_total: lineTotal,
+            gst_type: dbProduct.gst_type || 'GST',
+            gst_percentage: gstPercentage,
+            gst_amount: gstAmount
           });
         }
 
         // 2. Financial Calculations
-        const taxPercent = new Prisma.Decimal(orderData.tax_percent || '18.00');
-        
-        // tax_amount = subtotal * (taxPercent / 100)
-        const taxAmount = subtotal.mul(taxPercent).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const taxAmount = orderItems.reduce((sum, item) => sum.add(item.gst_amount), new Prisma.Decimal(0))
+          .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const taxPercent = subtotal.isZero()
+          ? new Prisma.Decimal(0)
+          : taxAmount.mul(100).div(subtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
         const totalAmount = subtotal.add(taxAmount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
 
-        let changeAmount = new Prisma.Decimal(0);
-        let amountTendered;
+        const payments = Array.isArray(orderData.payment)
+          ? orderData.payment
+          : [{
+              method: orderData.payment.method,
+              amount: orderData.payment.method === 'CASH'
+                ? orderData.payment.amount_tendered
+                : totalAmount.toFixed(2)
+            }];
+        const paidAmount = payments.reduce(
+          (sum, payment) => sum.add(new Prisma.Decimal(payment.amount)),
+          new Prisma.Decimal(0)
+        );
+        if (paidAmount.lt(totalAmount)) {
+          throw new AppError('Payment amount is less than total amount', 'VALIDATION_ERROR', 400);
+        }
+        const cashPayment = payments.find(payment => payment.method === 'CASH');
+        const changeAmount = cashPayment && paidAmount.gt(totalAmount)
+          ? paidAmount.sub(totalAmount)
+          : new Prisma.Decimal(0);
 
         // 3. Payment Validation
-        if (orderData.payment.method === 'CASH') {
-          amountTendered = new Prisma.Decimal(orderData.payment.amount_tendered);
-          if (amountTendered.lt(totalAmount)) {
-            throw new AppError('Amount tendered is less than total amount', 'VALIDATION_ERROR', 400);
-          }
-          changeAmount = amountTendered.sub(totalAmount);
-        } else {
-          amountTendered = totalAmount;
-        }
-
         // 4. Order Number Generation / Assignment
         let orderNumber = orderData.order_number;
         if (!orderNumber || String(orderNumber).trim() === '') {
@@ -92,6 +105,8 @@ const createOrder = async (orderData, userId) => {
         const newOrder = await tx.order.create({
           data: {
             order_number: orderNumber,
+            invoice_no: orderNumber,
+            reference_no: orderNumber,
             status: 'COMPLETED',
             subtotal: subtotal,
             discount_amount: new Prisma.Decimal(0), // Fixed to 0.00
@@ -103,15 +118,19 @@ const createOrder = async (orderData, userId) => {
               create: orderItems
             },
             payments: {
-              create: [{
-                method: orderData.payment.method,
-                amount: totalAmount,
+              create: payments.map(payment => ({
+                method: payment.method,
+                amount: new Prisma.Decimal(payment.amount),
                 status: 'PAID'
-              }]
+              }))
             }
           },
           include: {
-            items: true,
+            items: {
+              include: {
+                product: { select: { id: true, name: true } }
+              }
+            },
             payments: true
           }
         });
@@ -128,7 +147,7 @@ const createOrder = async (orderData, userId) => {
 
         return {
           order: newOrder,
-          change_amount: orderData.payment.method === 'CASH' ? changeAmount.toFixed(2) : undefined
+          change_amount: changeAmount.gt(0) ? changeAmount.toFixed(2) : undefined
         };
       });
     } catch (error) {
@@ -167,7 +186,7 @@ const getOrderInvoice = async (id) => {
   const payment = order.payments?.[0] || null;
 
   return {
-    invoice_number: order.order_number,
+    invoice_number: order.invoice_no || order.order_number,
     invoice_date: order.created_at,
     order_id: order.id,
     status: order.status,
@@ -180,7 +199,10 @@ const getOrderInvoice = async (id) => {
       quantity: item.quantity,
       unit_price: parseFloat(item.unit_price).toFixed(2),
       discount_amount: parseFloat(item.discount_amount).toFixed(2),
-      line_total: parseFloat(item.line_total).toFixed(2)
+      line_total: parseFloat(item.line_total).toFixed(2),
+      gst_type: item.gst_type,
+      gst_percentage: parseFloat(item.gst_percentage || 0).toFixed(2),
+      gst_amount: parseFloat(item.gst_amount || 0).toFixed(2)
     })),
     subtotal: parseFloat(order.subtotal).toFixed(2),
     discount_amount: parseFloat(order.discount_amount).toFixed(2),

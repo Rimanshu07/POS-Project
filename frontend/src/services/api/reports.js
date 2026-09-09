@@ -7,5 +7,7 @@ export const reportsApi = {
   getPayments: (params) => api.get('/reports/payments', { params }),
   getTax: (params) => api.get('/reports/tax', { params }),
   getDaily: (params) => api.get('/reports/daily', { params }),
-  getMonthly: (params) => api.get('/reports/monthly', { params })
+  getDailyDetails: (params) => api.get('/reports/daily/details', { params }),
+  getMonthly: (params) => api.get('/reports/monthly', { params }),
+  getMonthlyProducts: (params) => api.get('/reports/monthly/products', { params })
 };

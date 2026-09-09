@@ -10,8 +10,9 @@ export const Cart = () => {
   // Frontend calculation for display purposes only.
   // Backend is the authoritative source of truth.
   const subtotal = getSubtotal();
-  const taxRate = 0.18; // 18%
-  const taxAmount = subtotal * taxRate;
+  const taxAmount = items.reduce((sum, item) => (
+    sum + (parseFloat(item.price) * item.quantity * parseFloat(item.gst_percentage || 0) / 100)
+  ), 0);
   const total = subtotal + taxAmount;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 

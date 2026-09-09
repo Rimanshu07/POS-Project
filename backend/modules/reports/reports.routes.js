@@ -13,6 +13,8 @@ router.get('/categories', reportsController.getCategorySalesReport);
 router.get('/payments', reportsController.getPaymentReport);
 router.get('/tax', reportsController.getTaxReport);
 router.get('/daily', reportsController.getDailySalesReport);
+router.get('/daily/details', reportsController.getDailyProductDetails);
 router.get('/monthly', reportsController.getMonthlySalesReport);
+router.get('/monthly/products', reportsController.getMonthlyProductDetails);
 
 module.exports = router;

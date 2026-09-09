@@ -49,10 +49,26 @@ export const useDailySalesReport = (params) => {
   });
 };
 
+export const useDailyProductDetails = (params, enabled = true) => {
+  return useQuery({
+    queryKey: ['reports', 'daily-details', params],
+    queryFn: () => reportsApi.getDailyDetails(params),
+    enabled: enabled && Boolean(params?.date),
+  });
+};
+
 export const useMonthlySalesReport = (params) => {
   return useQuery({
     queryKey: ['reports', 'monthly', params],
     queryFn: () => reportsApi.getMonthly(params),
+    keepPreviousData: true,
+  });
+};
+
+export const useMonthlyProductDetails = (params) => {
+  return useQuery({
+    queryKey: ['reports', 'monthly-products', params],
+    queryFn: () => reportsApi.getMonthlyProducts(params),
     keepPreviousData: true,
   });
 };

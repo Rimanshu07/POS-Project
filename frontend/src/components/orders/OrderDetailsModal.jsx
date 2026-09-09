@@ -13,6 +13,13 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
   if (!isOpen) return null;
 
   const order = data?.order;
+  const itemTaxTotal = order?.items?.reduce(
+    (sum, item) => sum + parseFloat(item.gst_amount || 0),
+    0
+  ) || 0;
+  const itemTaxRate = parseFloat(order?.subtotal || 0) > 0
+    ? (itemTaxTotal / parseFloat(order.subtotal)) * 100
+    : 0;
 
   // Open a dedicated print popup with the receipt HTML so @media print CSS
   // conflicts with the main page don't cause a blank page.
@@ -54,7 +61,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
               <tr>
                 <td>${item.product?.name || 'Product'}<br/><span style="color:#555;font-size:10px;">@ ₹${parseFloat(item.unit_price).toFixed(2)}</span></td>
                 <td class="center">${item.quantity}</td>
-                <td class="right">₹${parseFloat(item.line_total).toFixed(2)}</td>
+                <td class="right">₹${parseFloat(item.line_total).toFixed(2)}<br/><span style="color:#555;font-size:10px;">${item.gst_type || 'GST'} ${parseFloat(item.gst_percentage || 0).toFixed(2)}%: ₹${parseFloat(item.gst_amount || 0).toFixed(2)}</span></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -157,6 +164,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">GST</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
@@ -169,6 +177,10 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                           <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.quantity}</td>
                           {/* HISTORICAL UNIT PRICE - AUTHORITATIVE */}
                           <td className="px-4 py-3 text-sm text-gray-500 text-right">₹{parseFloat(item.unit_price).toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-gray-500 text-right">
+                            {item.gst_type || 'GST'} {parseFloat(item.gst_percentage || 0).toFixed(2)}%<br />
+                            ₹{parseFloat(item.gst_amount || 0).toFixed(2)}
+                          </td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">₹{parseFloat(item.line_total).toFixed(2)}</td>
                         </tr>
                       ))}
@@ -208,6 +220,10 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                        <div className="flex justify-between">
                          <span className="text-gray-500">Subtotal:</span>
                          <span className="font-medium text-gray-900">₹{parseFloat(order.subtotal).toFixed(2)}</span>
+                       </div>
+                       <div className="flex justify-between">
+                         <span className="text-gray-500">GST (item-wise {itemTaxRate.toFixed(2)}%):</span>
+                         <span className="font-medium text-gray-900">₹{itemTaxTotal.toFixed(2)}</span>
                        </div>
                        <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
                          <span className="font-bold text-gray-900">Total:</span>

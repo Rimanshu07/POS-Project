@@ -103,13 +103,13 @@ export const ProductGrid = ({ products, isLoading }) => {
           <button
             key={product.id}
             onClick={() => setPopupProduct(product)}
-            className="flex flex-col text-left bg-white rounded-xl card-shadow border border-gray-100 p-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition-modern focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="flex flex-col text-left bg-[#fffdf9] rounded-2xl card-shadow border border-[#e8e1d5] p-3 hover:border-[#8cb99d] hover:bg-[#eef7f0] transition-modern focus:outline-none focus:ring-2 focus:ring-[#0e6b4f]"
           >
             <div className="w-full">
-              <h3 className="text-sm font-semibold text-gray-800 line-clamp-2 min-h-[40px] leading-snug">
+              <h3 className="text-sm font-semibold text-[#26332d] line-clamp-2 min-h-[40px] leading-snug">
                 {product.name}
               </h3>
-              <p className="mt-1 text-sm font-bold text-indigo-600">
+              <p className="mt-1 text-sm font-bold text-[#0e6b4f]">
                 ₹{parseFloat(product.price).toFixed(2)}
               </p>
             </div>
@@ -127,6 +127,5 @@ export const ProductGrid = ({ products, isLoading }) => {
     </>
   );
 };
-
 
 

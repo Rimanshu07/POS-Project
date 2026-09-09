@@ -15,7 +15,7 @@ const findAll = async ({ skip, take, search, is_active }) => {
       where,
       skip,
       take,
-      orderBy: { display_order: 'asc' }
+      orderBy: { name: 'asc' }
     }),
     prisma.category.count({ where })
   ]);
@@ -41,6 +41,16 @@ const create = async (data) => {
   return await prisma.category.create({ data });
 };
 
+const createMany = async (categories) => {
+  return prisma.$transaction(async (tx) => {
+    const created = [];
+    for (const category of categories) {
+      created.push(await tx.category.create({ data: category }));
+    }
+    return created;
+  });
+};
+
 const update = async (id, data) => {
   return await prisma.category.update({
     where: { id },
@@ -60,6 +70,7 @@ module.exports = {
   findById,
   findBySlug,
   create,
+  createMany,
   update,
   softDelete
 };

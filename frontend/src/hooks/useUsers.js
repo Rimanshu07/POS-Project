@@ -19,45 +19,39 @@ export const useUser = (id) => {
 
 export const useCreateUser = (options = {}) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: createUser,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      if (options.onSuccess) {
-        options.onSuccess(data, variables, context);
-      }
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useUpdateUser = (options = {}) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: ({ id, data }) => updateUser(id, data),
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      if (options.onSuccess) {
-        options.onSuccess(data, variables, context);
-      }
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
 
 export const useDeleteUser = (options = {}) => {
   const queryClient = useQueryClient();
-  
+  const { onSuccess, ...restOptions } = options;
   return useMutation({
     mutationFn: deleteUser,
     onSuccess: (data, variables, context) => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
-      if (options.onSuccess) {
-        options.onSuccess(data, variables, context);
-      }
+      if (onSuccess) onSuccess(data, variables, context);
     },
-    ...options
+    ...restOptions
   });
 };
