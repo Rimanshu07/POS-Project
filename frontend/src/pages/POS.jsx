@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useInfiniteProducts } from "../hooks/useProducts";
 import { useCategories } from "../hooks/useCategories";
@@ -28,6 +28,7 @@ export const POS = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const productsContainerRef = useRef(null);
 
   const productParams = {
     is_active: "true",
@@ -68,6 +69,18 @@ export const POS = () => {
       fetchNextPage();
     }
   };
+
+  useEffect(() => {
+    const element = productsContainerRef.current;
+    if (
+      element &&
+      element.scrollHeight <= element.clientHeight &&
+      hasNextPage &&
+      !isFetchingNextPage
+    ) {
+      fetchNextPage();
+    }
+  }, [products.length, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   const handleLogout = () => {
     if (window.confirm("Are you sure you want to logout?")) {
@@ -260,6 +273,7 @@ export const POS = () => {
             </div>
 
             <div
+              ref={productsContainerRef}
               className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-6"
               onScroll={handleProductScroll}
             >

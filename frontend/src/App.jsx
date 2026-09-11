@@ -10,11 +10,12 @@ import { Categories } from './pages/Categories';
 import { Reports } from './pages/Reports';
 import { Users } from './pages/Users';
 import { OrderHistory } from './pages/OrderHistory';
+import { LOGIN_ROUTE } from './routes/routePaths';
 
 function App() {
   return (
     <Routes>
-      <Route path="/login" element={<Login />} />
+      <Route path={LOGIN_ROUTE} element={<Login />} />
 
       {/* Protected Routes Wrapper */}
       <Route element={<AppLayout />}>

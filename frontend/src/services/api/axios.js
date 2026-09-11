@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { LOGIN_ROUTE } from '../../routes/routePaths';
 
 // Map backend error codes to user-friendly messages
 const ERROR_MESSAGES = {
@@ -42,13 +43,13 @@ api.interceptors.response.use(
         message: friendlyMessage
       };
 
-      // Redirect to login on 401, but NOT if the request was for login itself, and NOT if we are already on /login
+      // Redirect to the private login route on 401, but not for the login request itself.
       if (
         error.response.status === 401 && 
         !error.config.url.includes('/auth/login') &&
-        window.location.pathname !== '/login'
+        window.location.pathname !== LOGIN_ROUTE
       ) {
-        window.location.href = '/login';
+        window.location.href = LOGIN_ROUTE;
       }
 
       return Promise.reject(normalizedError);

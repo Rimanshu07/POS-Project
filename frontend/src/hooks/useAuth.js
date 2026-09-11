@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import api from '../services/api/axios';
+import { LOGIN_ROUTE } from '../routes/routePaths';
 
 export const useAuth = () => {
   const queryClient = useQueryClient();
@@ -36,7 +37,7 @@ export const useAuth = () => {
     onSuccess: () => {
       queryClient.setQueryData(['auth', 'me'], null);
       queryClient.clear();
-      window.location.href = '/login';
+      window.location.href = LOGIN_ROUTE;
     }
   });
 

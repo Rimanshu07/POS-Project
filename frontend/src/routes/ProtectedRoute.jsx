@@ -1,5 +1,6 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { LOGIN_ROUTE } from './routePaths';
 
 export const ProtectedRoute = ({ allowedRoles }) => {
   const { user, isLoading } = useAuth();
@@ -14,7 +15,7 @@ export const ProtectedRoute = ({ allowedRoles }) => {
 
   // Not authenticated
   if (!user) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={LOGIN_ROUTE} replace />;
   }
 
   // Check if role is allowed
