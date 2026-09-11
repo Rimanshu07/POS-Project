@@ -71,11 +71,11 @@ export const Login = () => {
         {/* Content */}
         <div className="relative z-10 flex flex-col justify-between p-12 w-full text-white">
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30 shadow-lg">
-              <Sparkles className="w-5 h-5" />
+          <div className="flex flex-col items-start gap-5">
+            <div className="w-28 h-28 rounded-2xl bg-white flex items-center justify-center border-4 border-white/20 shadow-2xl overflow-hidden p-1">
+              <img src="/logo.jpg" alt="Sherwoods POS Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
-            <span className="text-xl font-bold tracking-tight">
+            <span className="text-3xl font-bold tracking-tight">
               Sherwoods POS
             </span>
           </div>
@@ -124,11 +124,11 @@ export const Login = () => {
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-10">
         <div className="w-full max-w-md">
           {/* Mobile brand */}
-          <div className="lg:hidden flex items-center justify-center gap-3 mb-8">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center shadow-lg shadow-indigo-500/30">
-              <Sparkles className="w-5 h-5 text-white" />
+          <div className="lg:hidden flex flex-col items-center justify-center gap-4 mb-10">
+            <div className="w-28 h-28 rounded-2xl bg-white flex items-center justify-center shadow-xl shadow-indigo-500/20 overflow-hidden p-1 ring-1 ring-black/5">
+              <img src="/logo.jpg" alt="Sherwoods POS Logo" className="w-full h-full object-contain rounded-xl" />
             </div>
-            <span className="text-xl font-bold text-gray-900">
+            <span className="text-2xl font-bold text-gray-900">
               Sherwoods POS
             </span>
           </div>
