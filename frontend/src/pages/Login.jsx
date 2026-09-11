@@ -76,14 +76,14 @@ export const Login = () => {
               <Sparkles className="w-5 h-5" />
             </div>
             <span className="text-xl font-bold tracking-tight">
-              YourBrand POS
+              Sherwoods POS
             </span>
           </div>
 
           {/* Hero copy */}
           <div className="space-y-6 max-w-md">
             <h1 className="text-4xl xl:text-5xl font-bold leading-tight tracking-tight">
-              Welcome back to your dashboard.
+              Welcome back to Sherwoods dashboard.
             </h1>
             <p className="text-white/80 text-lg leading-relaxed">
               Manage your products, track sales, and grow your business faster
@@ -115,7 +115,7 @@ export const Login = () => {
 
           {/* Footer */}
           <div className="text-xs text-white/60 font-medium">
-            © {new Date().getFullYear()} YourBrand POS. All rights reserved.
+            © {new Date().getFullYear()} Sherwoods POS. All rights reserved.
           </div>
         </div>
       </div>
@@ -129,7 +129,7 @@ export const Login = () => {
               <Sparkles className="w-5 h-5 text-white" />
             </div>
             <span className="text-xl font-bold text-gray-900">
-              YourBrand POS
+              Sherwoods POS
             </span>
           </div>
 
@@ -203,12 +203,12 @@ export const Login = () => {
                   >
                     Password
                   </label>
-                  <a
+                  {/* <a
                     href="#"
                     className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 transition-modern"
                   >
                     Forgot?
-                  </a>
+                  </a> */}
                 </div>
                 <div className="relative group">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -250,7 +250,7 @@ export const Login = () => {
               </div>
 
               {/* Remember me */}
-              <div className="flex items-center">
+              {/* <div className="flex items-center">
                 <input
                   id="remember-me"
                   name="remember-me"
@@ -263,7 +263,7 @@ export const Login = () => {
                 >
                   Remember me for 30 days
                 </label>
-              </div>
+              </div> */}
 
               {/* Submit */}
               <button
