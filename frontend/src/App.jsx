@@ -17,12 +17,19 @@ function App() {
     <Routes>
       <Route path={LOGIN_ROUTE} element={<Login />} />
 
+      {/* Root redirect to /pos */}
+      <Route path="/" element={<Navigate to="/pos" replace />} />
+
+      {/* Full-screen POS Layout */}
+      <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'CASHIER']} />}>
+        <Route path="/pos" element={<POS />} />
+      </Route>
+
       {/* Protected Routes Wrapper */}
       <Route element={<AppLayout />}>
         
         {/* Dashboard: ADMIN, MANAGER */}
         <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER']} />}>
-          <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/products" element={<Products />} />
           <Route path="/categories" element={<Categories />} />
@@ -37,13 +44,8 @@ function App() {
 
       </Route>
 
-      {/* Full-screen POS Layout */}
-      <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'MANAGER', 'CASHIER']} />}>
-        <Route path="/pos" element={<POS />} />
-      </Route>
-
       {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="*" element={<Navigate to="/pos" replace />} />
     </Routes>
   );
 }

@@ -45,8 +45,7 @@ export const Login = () => {
   };
 
   if (user) {
-    if (user.role === "CASHIER") return <Navigate to="/pos" replace />;
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/pos" replace />;
   }
 
   return (

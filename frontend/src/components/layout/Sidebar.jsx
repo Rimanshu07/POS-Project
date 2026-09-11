@@ -43,7 +43,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
       )}>
       {/* Sidebar Logo Header */}
       <div className="flex h-20 shrink-0 items-center px-5 border-b border-[#285743]">
-        <NavLink to="/dashboard" onClick={onClose} className="flex items-center text-white tracking-wide hover:text-[#f2c879] transition-colors">
+        <NavLink to="/pos" onClick={onClose} className="flex items-center text-white tracking-wide hover:text-[#f2c879] transition-colors">
           <span className="bg-[#f2c879] text-[#163b2d] p-2 rounded-xl mr-3 text-sm font-bold shadow-sm">S</span>
           <span>
             <span className="block text-lg font-bold restaurant-heading">Sherwoods</span>

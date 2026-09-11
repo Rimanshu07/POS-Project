@@ -20,11 +20,7 @@ export const ProtectedRoute = ({ allowedRoles }) => {
 
   // Check if role is allowed
   if (allowedRoles && !allowedRoles.includes(user.role)) {
-    // If not allowed, redirect to a default safe route based on their role
-    if (user.role === 'CASHIER') {
-      return <Navigate to="/pos" replace />;
-    }
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/pos" replace />;
   }
 
   return <Outlet />;
