@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { seedMenu } = require('./seed_menu');
 
 const prisma = new PrismaClient();
 
@@ -99,6 +100,9 @@ async function main() {
       },
     });
   }
+
+  // Seed Granular Menu Data (Bar Menu + Food Menu)
+  await seedMenu();
 
   console.log('Database seed completed successfully.');
 }

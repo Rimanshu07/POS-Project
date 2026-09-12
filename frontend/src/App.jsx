@@ -9,6 +9,7 @@ import { Products } from './pages/Products';
 import { Categories } from './pages/Categories';
 import { Reports } from './pages/Reports';
 import { Users } from './pages/Users';
+import { AuditLogs } from './pages/AuditLogs';
 import { OrderHistory } from './pages/OrderHistory';
 import { LOGIN_ROUTE } from './routes/routePaths';
 
@@ -35,6 +36,11 @@ function App() {
           <Route path="/categories" element={<Categories />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/users" element={<Users />} />
+        </Route>
+
+        {/* Audit Logs: ADMIN ONLY */}
+        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+          <Route path="/audit-logs" element={<AuditLogs />} />
         </Route>
 
         {/* Orders: ADMIN, MANAGER, CASHIER */}

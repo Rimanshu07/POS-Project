@@ -4,7 +4,10 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "seed": "node prisma/seed.js",
+    "seed:menu": "node prisma/seed_menu.js",
+    "seed:fresh": "node prisma/clean_and_seed.js"
   },
   "keywords": [],
   "author": "",

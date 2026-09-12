@@ -15,8 +15,16 @@ const app = express();
 
 // Security Middleware
 app.use(helmet());
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:5175',
+  'http://localhost:5176'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:5173',
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -54,6 +62,8 @@ app.use('/api/v1/orders', orderRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/dashboard', dashboardRoutes);
 app.use('/api/v1/reports', reportsRoutes);
+const auditLogRoutes = require('./modules/auditLogs/auditLogs.routes');
+app.use('/api/v1/audit-logs', auditLogRoutes);
 
 app.get('/health', (req, res) => res.status(200).json({ status: 'ok' }));
 

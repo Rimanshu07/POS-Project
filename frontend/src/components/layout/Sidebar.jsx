@@ -7,7 +7,8 @@ import {
   Tags, 
   BarChart3, 
   Users,
-  ShoppingBag
+  ShoppingBag,
+  ShieldCheck
 } from 'lucide-react';
 import clsx from 'clsx';
 
@@ -24,6 +25,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
     { name: 'Sales & Report', href: '/reports', icon: BarChart3, roles: ['ADMIN', 'MANAGER'] },
     // { name: 'All Sales', href: '/orders', icon: ShoppingBag, roles: ['ADMIN', 'MANAGER', 'CASHIER'] },
     { name: 'User Management', href: '/users', icon: Users, roles: ['ADMIN', 'MANAGER'] },
+    { name: 'Audit Logs', href: '/audit-logs', icon: ShieldCheck, roles: ['ADMIN'] },
   ];
 
   const allowedNav = navigation.filter(item => item.roles.includes(user?.role));

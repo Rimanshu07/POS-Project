@@ -16,7 +16,7 @@ const productSchema = z.object({
 });
 
 export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting }) => {
-  const { data: categoriesData } = useCategories({ is_active: 'true' });
+  const { data: categoriesData } = useCategories({ is_active: 'true', limit: 1000 });
   const categories = categoriesData?.categories || [];
 
   const {
@@ -42,12 +42,12 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
       if (product) {
         reset({
           name: product.name,
-          category_id: product.category_id.toString(),
-          price: product.price,
+          category_id: product.category_id ? String(product.category_id) : '',
+          price: product.price ? String(product.price) : '',
           gst_type: product.gst_type || 'GST',
           gst_percentage: product.gst_percentage?.toString() || '0',
           description: product.description || '',
-          is_active: product.is_active
+          is_active: product.is_active !== undefined ? product.is_active : true
         });
       } else {
         reset({
@@ -61,7 +61,7 @@ export const ProductModal = ({ isOpen, onClose, onSubmit, product, isSubmitting 
         });
       }
     }
-  }, [isOpen, product, reset]);
+  }, [isOpen, product, reset, categoriesData]);
 
   if (!isOpen) return null;
 

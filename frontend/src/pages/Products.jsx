@@ -36,7 +36,7 @@ export const Products = () => {
 
   const { data: productsData, isLoading, isError } = useProducts(queryParams);
   const { data: productCountData } = useProducts({ limit: 1 });
-  const { data: categoriesData } = useCategories({ is_active: 'true' });
+  const { data: categoriesData } = useCategories({ is_active: 'true', limit: 1000 });
   const { data: categoryCountData } = useCategories({ limit: 1 });
 
   const products = productsData?.products || [];
