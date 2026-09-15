@@ -7,7 +7,7 @@ const getTodayMetrics = async (startOfToday, endOfToday) => {
     _sum: { total_amount: true },
     _count: { id: true },
     where: {
-      status: 'COMPLETED',
+      status: { in: ['COMPLETED', 'PENDING'] },
       created_at: {
         gte: startOfToday,
         lte: endOfToday
@@ -20,7 +20,7 @@ const getTodayMetrics = async (startOfToday, endOfToday) => {
     _sum: { quantity: true },
     where: {
       order: {
-        status: 'COMPLETED',
+        status: { in: ['COMPLETED', 'PENDING'] },
         created_at: {
           gte: startOfToday,
           lte: endOfToday
@@ -45,7 +45,7 @@ const getTopProducts = async (startDate, endDate) => {
     FROM \`order_items\` oi
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
-    WHERE o.status = 'COMPLETED'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY p.id, p.name
@@ -65,7 +65,7 @@ const getTopCategories = async (startDate, endDate) => {
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
     JOIN \`categories\` c ON p.category_id = c.id
-    WHERE o.status = 'COMPLETED'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY c.id, c.name
@@ -84,7 +84,7 @@ const getPaymentBreakdown = async (startDate, endDate) => {
     where: {
       status: 'PAID',
       order: {
-        status: 'COMPLETED',
+        status: { in: ['COMPLETED', 'PENDING'] },
         created_at: {
           gte: startDate,
           lte: endDate
@@ -103,7 +103,7 @@ const getSalesTrend = async (startDate, endDate) => {
       DATE(o.created_at) AS date,
       COALESCE(SUM(o.total_amount), 0) AS sales
     FROM \`orders\` o
-    WHERE o.status = 'COMPLETED'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY DATE(o.created_at)

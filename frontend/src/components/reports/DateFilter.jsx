@@ -33,6 +33,7 @@ export const DateFilter = ({ preset, setPreset, customDate, setCustomDate }) => 
           <input
             type="date"
             value={customDate.from}
+            {...(customDate.to && { max: customDate.to })}
             onChange={(e) => setCustomDate({ ...customDate, from: e.target.value })}
             className="form-input block w-full sm:w-auto px-3 py-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           />
@@ -40,6 +41,7 @@ export const DateFilter = ({ preset, setPreset, customDate, setCustomDate }) => 
           <input
             type="date"
             value={customDate.to}
+            {...(customDate.from && { min: customDate.from })}
             onChange={(e) => setCustomDate({ ...customDate, to: e.target.value })}
             className="form-input block w-full sm:w-auto px-3 py-2 text-sm border-gray-300 rounded-md shadow-sm focus:border-indigo-500 focus:ring-indigo-500"
           />

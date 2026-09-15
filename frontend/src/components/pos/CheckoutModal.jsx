@@ -1,12 +1,13 @@
 import React, { useRef, useState } from 'react';
 import { useCartStore } from '../../store/useCartStore';
-import { X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
 import { useCreateOrder } from '../../hooks/usePOS';
+import { buildReceiptHtml } from '../../utils/receiptHtml';
 
 export const CheckoutModal = ({ isOpen, onClose, total }) => {
-  const { items, clearCart } = useCartStore();
+  const { items, clearCart, discount, setDiscount, pendingOrderNumber } = useCartStore();
   const [paymentAmounts, setPaymentAmounts] = useState({ CASH: '', UPI: '', CARD: '', NEFT: '', RTGS: '', OTHERS: '' });
-  const [billNo, setBillNo] = useState('');
+  const [billNo, setBillNo] = useState(pendingOrderNumber || '');
   const [errorMsg, setErrorMsg] = useState(null);
   const [errorField, setErrorField] = useState(null);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -35,78 +36,24 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
   const createOrderMutation = useCreateOrder();
 
   const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-  const taxAmount = parseFloat(total) - subtotal;
+  const discountAmount = discount.type === 'FLAT' 
+    ? parseFloat(discount.value || 0) 
+    : subtotal * (parseFloat(discount.value || 0) / 100);
+  
+  const taxAmount = items.reduce((sum, item) => {
+    const lineTotal = parseFloat(item.price) * item.quantity;
+    const proportion = subtotal > 0 ? lineTotal / subtotal : 0;
+    const itemDiscount = discountAmount * proportion;
+    const discountedLine = lineTotal - itemDiscount;
+    return sum + (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
+  }, 0);
+
+  const exactTotal = Math.max(0, subtotal - discountAmount) + taxAmount;
+  const roundedTotal = Math.round(exactTotal);
+  const roundOff = roundedTotal - exactTotal;
 
   const displayBillNo = billNo || 'NEW_ORDER';
   
-  const buildReceiptHtml = (billLabel, orderItemsList, subtotalAmt, taxAmt, totalAmt, payMethod, tenderedAmt) => {
-    const now = new Date();
-    const dd = String(now.getDate()).padStart(2,'0');
-    const mm = String(now.getMonth()+1).padStart(2,'0');
-    const yy = String(now.getFullYear()).slice(-2);
-    const hh = String(now.getHours()).padStart(2,'0');
-    const min = String(now.getMinutes()).padStart(2,'0');
-    const dateStr = `${dd}/${mm}/${yy} ${hh}:${min}`;
-    const grandRounded = Math.round(totalAmt);
-    const roundOff = (grandRounded - totalAmt).toFixed(2);
-    const totalQty = orderItemsList.reduce((s, i) => s + i.quantity, 0);
-    const change = payMethod === 'CASH' && parseFloat(tenderedAmt || 0) > totalAmt
-      ? (parseFloat(tenderedAmt) - totalAmt).toFixed(2) : null;
-    return `<!DOCTYPE html><html><head>
-      <title>Receipt - ${billLabel}</title>
-      <style>
-        body { font-family: 'Courier New', monospace; padding: 12px 10px; max-width: 300px; margin: 0 auto; font-size: 11px; color: #000; background: #fff; line-height: 1.5; }
-        .center { text-align: center; }
-        .bold { font-weight: bold; }
-        .divider-solid { border-top: 1px solid #000; margin: 5px 0; }
-        .divider-dash { border-top: 1px dashed #000; margin: 5px 0; }
-        .row { display: flex; justify-content: space-between; margin: 1px 0; }
-        .grid4 { display: grid; grid-template-columns: 1fr 28px 52px 48px; margin: 1px 0; }
-        .gst-line { font-size: 10px; color: #333; padding-left: 4px; }
-        .right { text-align: right; } .center-t { text-align: center; }
-        .grand { font-size: 13px; font-weight: bold; }
-        .footer { text-align: center; font-size: 10px; margin-top: 6px; }
-      </style>
-    </head><body>
-      <div class="center">
-        <div style="font-size:10px;">Duplicate</div>
-        <div style="font-size:15px;font-weight:bold;">Sherwoods Restaurant</div>
-        <div style="font-size:10px;">(M/s Da Foodie Restaurant)</div>
-        <div style="font-size:10px;">GSTIN : 23AAUFD7167P1ZK</div>
-        <div style="font-size:10px;">Plot no 56/2/110,69,79 Canal Road,</div>
-        <div style="font-size:10px;">Bawadiya Kalan, Bhopal</div>
-        <div style="font-size:10px;">Contact No : 9244291400</div>
-      </div>
-      <div class="divider-solid"></div>
-      <div class="divider-solid"></div>
-      <div class="row"><span>Date: ${dateStr}</span></div>
-      <div class="row"><span>Cashier: biller</span><span>Bill No.: ${billLabel}</span></div>
-      <div class="divider-solid"></div>
-      <div class="grid4"><span class="bold">Item</span><span class="center-t bold">Qty.</span><span class="right bold">Price</span><span class="right bold">Amount</span></div>
-      <div class="divider-dash"></div>
-      ${orderItemsList.map(item => `<div class="grid4">
-        <span style="word-break:break-word;padding-right:4px;">${item.product?.name || 'Product'}</span>
-        <span class="center-t">${item.quantity}</span>
-        <span class="right">${parseFloat(item.unit_price).toFixed(2)}</span>
-        <span class="right">${parseFloat(item.line_total).toFixed(2)}</span>
-      </div><div class="gst-line">${item.gst_type || 'GST'} ${parseFloat(item.gst_percentage || 0).toFixed(2)}%: ₹${parseFloat(item.gst_amount || 0).toFixed(2)}</div>`).join('')}
-      <div class="divider-dash"></div>
-      <div class="row"><span>Total Qty: ${totalQty}</span><span>Sub Total &nbsp;${subtotalAmt.toFixed(2)}</span></div>
-      ${taxAmt > 0 ? `<div class="row"><span>GST</span><span>${taxAmt.toFixed(2)}</span></div>` : ''}
-      <div class="divider-solid"></div>
-      <div class="row"><span>Round off</span><span>${parseFloat(roundOff) >= 0 ? '+'+roundOff : roundOff}</span></div>
-      <div class="row grand"><span>Grand Total</span><span>&#8377;${grandRounded}.00</span></div>
-      <div class="divider-solid"></div>
-      <div style="font-size:11px;">Paid via ${payMethod}</div>
-      ${change ? `<div class="row"><span>Change:</span><span>&#8377;${change}</span></div>` : ''}
-      <div class="divider-dash"></div>
-      <div class="footer">
-        <div>FSSAI No : 11420010000718</div>
-        <div class="bold">Thank you &amp; Visit Again !!</div>
-      </div>
-    </body></html>`;
-  };
-
   const previewHtml = React.useMemo(() => {
     const orderItems = items.map(i => ({
       product: { name: i.name },
@@ -120,11 +67,11 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
     const paymentLabel = Object.entries(paymentAmounts)
       .filter(([, amount]) => parseFloat(amount || 0) > 0)
       .map(([paymentMethod]) => paymentMethod)
-      .join(' + ') || 'CASH';
-    return buildReceiptHtml(displayBillNo, orderItems, subtotal, taxAmount, parseFloat(total), paymentLabel, paymentAmounts.CASH);
-  }, [items, subtotal, taxAmount, total, paymentAmounts, displayBillNo]);
+      .join(' + ') || '';
+    return buildReceiptHtml(displayBillNo, orderItems, subtotal, taxAmount, parseFloat(total), paymentLabel, paymentAmounts.CASH, discountAmount);
+  }, [items, subtotal, taxAmount, total, paymentAmounts, displayBillNo, discountAmount]);
 
-  const handleCheckout = async () => {
+  const handleCheckout = async (isPayLater = false) => {
     setErrorMsg(null);
     setErrorField(null);
 
@@ -135,15 +82,20 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
     }
 
     const totalPaid = Object.values(paymentAmounts).reduce((sum, amount) => sum + parseFloat(amount || 0), 0);
-    if (totalPaid <= 0) {
-      setErrorField('payment');
-      setErrorMsg('Please add at least one payment.');
-      return;
-    }
-    if (totalPaid < parseFloat(total)) {
-      setErrorField('payment');
-      setErrorMsg(`Payment is short by ₹${(parseFloat(total) - totalPaid).toFixed(2)}.`);
-      return;
+    
+    if (!isPayLater) {
+      if (totalPaid <= 0) {
+        setErrorField('payment');
+        setErrorMsg('Please add at least one payment or use Pay Later.');
+        return;
+      }
+      // Allow payment if it covers at least the rounded down exact total
+      const minAllowed = Math.floor(exactTotal);
+      if (totalPaid < minAllowed) {
+        setErrorField('payment');
+        setErrorMsg(`Payment is short by ₹${(minAllowed - totalPaid).toFixed(2)}. Minimum accepted payment is ₹${minAllowed.toFixed(2)}.`);
+        return;
+      }
     }
 
     const payload = {
@@ -152,7 +104,8 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         product_id: item.product_id,
         quantity: item.quantity
       })),
-      payment: Object.entries(paymentAmounts)
+      discount_amount: discountAmount,
+      payment: isPayLater ? [] : Object.entries(paymentAmounts)
         .filter(([, amount]) => parseFloat(amount || 0) > 0)
         .map(([paymentMethod, amount]) => ({
           method: paymentMethod,
@@ -176,12 +129,12 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         : items.map(i => ({ product: { name: i.name }, quantity: i.quantity, unit_price: i.price, line_total: parseFloat(i.price) * i.quantity, gst_type: i.gst_type, gst_percentage: i.gst_percentage, gst_amount: parseFloat(i.price) * i.quantity * parseFloat(i.gst_percentage || 0) / 100 }));
       const finalSubtotal = order.subtotal ? parseFloat(order.subtotal) : subtotal;
       const finalTax = order.tax_amount ? parseFloat(order.tax_amount) : taxAmount;
-      const finalTotal = order.total_amount ? parseFloat(order.total_amount) : parseFloat(total);
-      const paymentLabel = Object.entries(paymentAmounts)
+      const paymentLabel = isPayLater ? '' : Object.entries(paymentAmounts)
         .filter(([, amount]) => parseFloat(amount || 0) > 0)
         .map(([paymentMethod]) => paymentMethod)
         .join(' + ');
-      const receiptHtml = buildReceiptHtml(finalBillNo, orderItems, finalSubtotal, finalTax, finalTotal, paymentLabel, paymentAmounts.CASH);
+      const finalTotal = order.total_amount ? parseFloat(order.total_amount) : parseFloat(total);
+      const receiptHtml = buildReceiptHtml(finalBillNo, orderItems, finalSubtotal, finalTax, finalTotal, paymentLabel, paymentAmounts.CASH, discountAmount);
 
       const pw = window.open('', '_blank', 'width=420,height=640');
       if (pw) {
@@ -293,11 +246,55 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                       <span className="font-medium text-gray-900">₹{(parseFloat(item.price) * item.quantity).toFixed(2)}</span>
                     </div>
                   ))}
-                  <div className="border-t border-gray-200 pt-2 mt-2 space-y-1">
+                  <div className="border-t border-gray-200 pt-2 mt-2 space-y-2">
                     <div className="flex justify-between text-gray-500"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
-                    <div className="flex justify-between text-gray-500"><span>Tax</span><span>₹{taxAmount.toFixed(2)}</span></div>
+                    
+                    {/* Discount Input */}
+                    <div className="flex items-center justify-between text-gray-500">
+                      <span>Discount</span>
+                      <div className="flex items-center gap-2">
+                        <div className="flex bg-gray-200 rounded-md p-0.5">
+                          <button 
+                            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${discount.type === 'FLAT' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                            onClick={() => setDiscount(discount.value, 'FLAT')}
+                          >
+                            ₹
+                          </button>
+                          <button 
+                            className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${discount.type === 'PERCENT' ? 'bg-white shadow-sm text-indigo-600' : 'text-gray-500'}`}
+                            onClick={() => setDiscount(discount.value, 'PERCENT')}
+                          >
+                            %
+                          </button>
+                        </div>
+                        <input 
+                          type="number" 
+                          min="0"
+                          value={discount.value}
+                          onChange={e => setDiscount(e.target.value, discount.type)}
+                          className="w-16 px-1 text-right bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 focus:text-indigo-600 tabular-nums text-sm font-medium"
+                          placeholder="0"
+                        />
+                      </div>
+                    </div>
+                    
+                    {discountAmount > 0 && (
+                      <div className="flex justify-between text-red-600 text-xs">
+                        <span>Discount Amount</span>
+                        <span>-₹{discountAmount.toFixed(2)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between text-gray-500 text-xs mt-1"><span>CGST</span><span>₹{(taxAmount / 2).toFixed(2)}</span></div>
+                    <div className="flex justify-between text-gray-500 text-xs"><span>SGST</span><span>₹{(taxAmount / 2).toFixed(2)}</span></div>
+                    
+                    <div className="flex justify-between text-gray-400 text-xs mt-1">
+                      <span>Round Off</span>
+                      <span>{roundOff >= 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+                    </div>
+
                     <div className="flex justify-between font-bold text-gray-900 text-base pt-1 border-t border-gray-200">
-                      <span>Total</span><span>₹{parseFloat(total).toFixed(2)}</span>
+                      <span>Final Total</span><span>₹{parseFloat(total).toFixed(2)}</span>
                     </div>
                   </div>
                 </div>
@@ -377,7 +374,15 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
             Cancel
           </button>
           <button
-            onClick={handleCheckout}
+            onClick={() => handleCheckout(true)}
+            disabled={createOrderMutation.isPending}
+            className="px-4 py-2 text-sm font-bold text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200 rounded-lg disabled:opacity-70 transition-colors flex items-center gap-2"
+          >
+            <Clock className="w-4 h-4" />
+            Punch (Pay Later)
+          </button>
+          <button
+            onClick={() => handleCheckout(false)}
             disabled={createOrderMutation.isPending}
             className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-70 transition-colors"
           >

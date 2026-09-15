@@ -33,7 +33,7 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
     if (!products) return { totalQuantity: 0, totalSales: 0, totalProducts: 0, totalCategories: 0 };
     return {
       totalQuantity: products.reduce((s, p) => s + p.total_quantity, 0),
-      totalSales: products.reduce((s, p) => s + p.total_amount, 0),
+      totalProductSales: products.reduce((s, p) => s + p.total_amount, 0),
       totalProducts: new Set(products.map(p => p.product_name)).size,
       totalCategories: Object.keys(productsByCategory).length
     };
@@ -47,6 +47,8 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
       'Orders': p.order_count,
       'Quantity': p.total_quantity,
       'Avg Price': parseFloat(p.avg_price).toFixed(2),
+      'CGST': `${Number(p.tax_rate / 2 || 0).toFixed(2)}% (₹${Number(p.tax_amount / 2 || 0).toFixed(2)})`,
+      'SGST': `${Number(p.tax_rate / 2 || 0).toFixed(2)}% (₹${Number(p.tax_amount / 2 || 0).toFixed(2)})`,
       'Total Amount': parseFloat(p.total_amount).toFixed(2)
     }));
     const totalRow = {
@@ -55,9 +57,24 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
       'Orders': '-',
       'Quantity': totals.totalQuantity,
       'Avg Price': '-',
-      'Total Amount': totals.totalSales.toFixed(2)
+      'CGST': '-',
+      'SGST': '-',
+      'Total Amount': totals.totalProductSales.toFixed(2)
     };
+    
+    const finalTotalRow = {
+      'Category': 'FINAL',
+      'Product': 'After Discounts & Round Off',
+      'Orders': '-',
+      'Quantity': '-',
+      'Avg Price': '-',
+      'CGST': '-',
+      'SGST': '-',
+      'Total Amount': parseFloat(monthData.total_grand_total).toFixed(2)
+    };
+    
     excelData.push(totalRow);
+    excelData.push(finalTotalRow);
     const ws = XLSX.utils.json_to_sheet(excelData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `${MONTH_NAMES[month - 1]} ${year}`);
@@ -108,10 +125,12 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
           <div className="text-xs font-medium text-amber-500 mt-1">Categories</div>
         </div>
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-center">
-          <div className="text-2xl font-bold text-blue-700">{formatCurrency(totals.totalSales)}</div>
+          <div className="text-2xl font-bold text-blue-700">{formatCurrency(monthData.total_grand_total)}</div>
           <div className="text-xs font-medium text-blue-500 mt-1">Total Sales</div>
         </div>
       </div>
+      
+
 
       {/* Product Breakdown by Category */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -152,6 +171,8 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
                           <th className="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">Orders</th>
                           <th className="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">Quantity</th>
                           <th className="px-4 py-2 text-right text-xs font-bold text-gray-600 uppercase">Avg Price</th>
+                          <th className="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">CGST</th>
+                          <th className="px-4 py-2 text-center text-xs font-bold text-gray-600 uppercase">SGST</th>
                           <th className="px-4 py-2 text-right text-xs font-bold text-gray-600 uppercase">Total Amount</th>
                         </tr>
                       </thead>
@@ -166,6 +187,14 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
                             </td>
                             <td className="px-4 py-2 text-center text-sm text-gray-700">{product.total_quantity}</td>
                             <td className="px-4 py-2 text-right text-sm text-gray-600">{formatCurrency(product.avg_price)}</td>
+                            <td className="px-4 py-2 text-center text-gray-600">
+                              {Number(product.tax_rate / 2 || 0).toFixed(2)}%<br/>
+                              <span className="text-xs text-gray-500">{formatCurrency(product.tax_amount / 2)}</span>
+                            </td>
+                            <td className="px-4 py-2 text-center text-gray-600">
+                              {Number(product.tax_rate / 2 || 0).toFixed(2)}%<br/>
+                              <span className="text-xs text-gray-500">{formatCurrency(product.tax_amount / 2)}</span>
+                            </td>
                             <td className="px-4 py-2 text-right text-sm font-bold text-green-700">{formatCurrency(product.total_amount)}</td>
                           </tr>
                         ))}
@@ -177,6 +206,8 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
                           </td>
                           <td className="px-4 py-2 text-center text-sm font-bold text-gray-700">{categoryQty}</td>
                           <td className="px-4 py-2"></td>
+                          <td className="px-4 py-2"></td>
+                          <td className="px-4 py-2"></td>
                           <td className="px-4 py-2 text-right text-sm font-bold text-green-700">{formatCurrency(categoryTotal)}</td>
                         </tr>
                       </tfoot>
@@ -185,6 +216,30 @@ const MonthProductDetailView = ({ year, month, monthData, onBack }) => {
                 </div>
               );
             })}
+            
+            {/* Grand Total Footer */}
+            <div className="p-5 border-t-2 border-gray-200 bg-gray-50 flex justify-end">
+              <div className="w-full sm:w-1/2 lg:w-1/3 space-y-2">
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Products Total (Gross + Tax)</span>
+                  <span className="font-medium text-gray-900">{formatCurrency(totals.totalProductSales)}</span>
+                </div>
+                {parseFloat(monthData.total_discount || 0) > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Order Discounts</span>
+                    <span>-{formatCurrency(monthData.total_discount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm text-gray-500">
+                  <span>Round Off</span>
+                  <span>{formatCurrency(monthData.total_grand_total - (monthData.total_gross_sale - monthData.total_discount + monthData.total_tax))}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold text-gray-900 pt-2 border-t border-gray-200 mt-2">
+                  <span>Final Total</span>
+                  <span className="text-blue-700">{formatCurrency(monthData.total_grand_total)}</span>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -213,21 +268,39 @@ export const MonthlySalesReport = () => {
 
   const handleDownloadExcel = () => {
     if (!monthlyData) return;
-    const excelData = monthlyData.map(monthData => ({
-      'Month': MONTH_NAMES[monthData.sale_month - 1],
-      'Orders': monthData.total_orders,
-      'Items Sold': monthData.total_items_sold,
-      'Total Sales': parseFloat(monthData.total_grand_total).toFixed(2),
-      'Tax': parseFloat(monthData.total_tax).toFixed(2),
-      'Discount': parseFloat(monthData.total_discount).toFixed(2)
-    }));
+    const excelData = monthlyData.map(monthData => {
+      const gross = parseFloat(monthData.total_gross_sale);
+      const discount = parseFloat(monthData.total_discount);
+      const tax = parseFloat(monthData.total_tax);
+      const total = parseFloat(monthData.total_grand_total);
+      const roundOff = total - (gross - discount + tax);
+
+      return {
+        'Month': MONTH_NAMES[monthData.sale_month - 1],
+        'Orders': monthData.total_orders,
+        'Items Sold': monthData.total_items_sold,
+        'Gross Sale': gross.toFixed(2),
+        'Discount': discount.toFixed(2),
+        'Tax': tax.toFixed(2),
+        'Round Off': roundOff.toFixed(2),
+        'Total Sales': total.toFixed(2)
+      };
+    });
+
+    const totalGross = monthlyData.reduce((sum, m) => sum + parseFloat(m.total_gross_sale), 0);
+    const totalDiscount = monthlyData.reduce((sum, m) => sum + parseFloat(m.total_discount), 0);
+    const totalTax = monthlyData.reduce((sum, m) => sum + parseFloat(m.total_tax), 0);
+    const totalGrand = monthlyData.reduce((sum, m) => sum + parseFloat(m.total_grand_total), 0);
+
     const totals = {
       'Month': 'TOTAL',
-      'Orders': monthlyData.reduce((sum, m) => sum + m.total_orders, 0),
-      'Items Sold': monthlyData.reduce((sum, m) => sum + m.total_items_sold, 0),
-      'Total Sales': monthlyData.reduce((sum, m) => sum + parseFloat(m.total_grand_total), 0).toFixed(2),
-      'Tax': monthlyData.reduce((sum, m) => sum + parseFloat(m.total_tax), 0).toFixed(2),
-      'Discount': monthlyData.reduce((sum, m) => sum + parseFloat(m.total_discount), 0).toFixed(2)
+      'Orders': monthlyData.reduce((sum, m) => sum + parseInt(m.total_orders), 0),
+      'Items Sold': monthlyData.reduce((sum, m) => sum + parseInt(m.total_items_sold), 0),
+      'Gross Sale': totalGross.toFixed(2),
+      'Discount': totalDiscount.toFixed(2),
+      'Tax': totalTax.toFixed(2),
+      'Round Off': (totalGrand - (totalGross - totalDiscount + totalTax)).toFixed(2),
+      'Total Sales': totalGrand.toFixed(2)
     };
     excelData.push(totals);
     const ws = XLSX.utils.json_to_sheet(excelData);
@@ -328,17 +401,30 @@ export const MonthlySalesReport = () => {
                             <div className="text-lg font-bold text-blue-600">{monthData.total_items_sold}</div>
                             <div className="text-xs text-gray-500">Items</div>
                           </div>
-                          <div className="col-span-2">
-                            <div className="text-lg font-bold text-green-700">{formatCurrency(monthData.total_grand_total)}</div>
-                            <div className="text-xs text-gray-500">Total Sales</div>
+                          <div>
+                            <div className="text-lg font-bold text-green-700">{formatCurrency(monthData.total_gross_sale)}</div>
+                            <div className="text-xs text-gray-500">Gross Sale</div>
+                          </div>
+                          <div>
+                            <div className="text-lg font-bold text-red-600">{formatCurrency(monthData.total_discount)}</div>
+                            <div className="text-xs text-gray-500">Discount</div>
                           </div>
                           <div>
                             <div className="text-lg font-bold text-amber-600">{formatCurrency(monthData.total_tax)}</div>
                             <div className="text-xs text-gray-500">Tax</div>
                           </div>
                           <div>
-                            <div className="text-lg font-bold text-red-600">{formatCurrency(monthData.total_discount)}</div>
-                            <div className="text-xs text-gray-500">Discount</div>
+                            <div className="text-lg font-bold text-purple-600">
+                              {formatCurrency(
+                                parseFloat(monthData.total_grand_total) - 
+                                (parseFloat(monthData.total_gross_sale) - parseFloat(monthData.total_discount) + parseFloat(monthData.total_tax))
+                              )}
+                            </div>
+                            <div className="text-xs text-gray-500">Round Off</div>
+                          </div>
+                          <div className="col-span-2 border-t pt-2 mt-1">
+                            <div className="text-xl font-bold text-blue-700">{formatCurrency(monthData.total_grand_total)}</div>
+                            <div className="text-xs font-bold text-blue-500">TOTAL SALES</div>
                           </div>
                         </div>
                       ) : (

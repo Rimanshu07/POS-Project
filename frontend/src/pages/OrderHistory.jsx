@@ -3,6 +3,9 @@ import { useOrders } from '../hooks/useOrders';
 import { Search, Filter, AlertCircle, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { OrderDetailsModal } from '../components/orders/OrderDetailsModal';
 import clsx from 'clsx';
+import { useNavigate } from 'react-router-dom';
+import { useCartStore } from '../store/useCartStore';
+import { getOrderById } from '../services/api/orders';
 
 export const OrderHistory = () => {
   const [page, setPage] = useState(1);
@@ -14,6 +17,10 @@ export const OrderHistory = () => {
   const [debouncedSearch, setDebouncedSearch] = useState('');
 
   const [selectedOrderId, setSelectedOrderId] = useState(null);
+  const [isSettlingId, setIsSettlingId] = useState(null);
+  
+  const navigate = useNavigate();
+  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
   
   // Debounce search
   useEffect(() => {
@@ -39,6 +46,34 @@ export const OrderHistory = () => {
 
   const orders = data?.orders || [];
   const meta = data?.meta || { totalPages: 1, total: 0 };
+
+  const handleDirectSettle = async (orderId) => {
+    setIsSettlingId(orderId);
+    try {
+      const response = await getOrderById(orderId);
+      const order = response.data?.order || response.order;
+      if (!order) throw new Error("Order not found");
+      
+      const cartItems = order.items.map(item => ({
+        product_id: item.product_id,
+        name: item.product?.name || item.name || `Product #${item.product_id}`,
+        price: item.unit_price,
+        quantity: item.quantity,
+        gst_type: item.gst_type,
+        gst_percentage: item.gst_percentage
+      }));
+      
+      setItems(cartItems);
+      setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+      setPendingOrderNumber(order.order_number);
+      navigate('/pos', { state: { autoCheckout: true } });
+    } catch (error) {
+      console.error('Failed to settle directly', error);
+      setSelectedOrderId(orderId); // Fallback to details modal
+    } finally {
+      setIsSettlingId(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -162,6 +197,21 @@ export const OrderHistory = () => {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      {order.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleDirectSettle(order.id)}
+                          disabled={isSettlingId === order.id}
+                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70 disabled:animate-none"
+                          title="Settle Payment"
+                        >
+                          {isSettlingId === order.id ? (
+                            <span className="w-4 h-4 mr-1 inline-block border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                          ) : (
+                            <span className="mr-1">✓</span>
+                          )}
+                          Settle
+                        </button>
+                      )}
                       <button
                         onClick={() => setSelectedOrderId(order.id)}
                         className="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 p-2 rounded-md transition-colors inline-flex items-center"

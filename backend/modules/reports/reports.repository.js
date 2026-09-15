@@ -5,15 +5,15 @@ const getSalesReport = async (startDate, endDate, groupBy = 'date') => {
   if (groupBy === 'month') {
     const result = await prisma.$queryRaw`
       SELECT 
-        DATE_FORMAT(o.created_at, '%Y-%m') AS date,
+        DATE_FORMAT(CONVERT_TZ(o.created_at, '+00:00', '+05:30'), '%Y-%m') AS date,
         COALESCE(SUM(o.total_amount), 0) AS sales,
         COALESCE(SUM(o.tax_amount), 0) AS tax,
         COUNT(o.id) AS orders_count
       FROM \`orders\` o
-      WHERE LOWER(o.status) = 'completed'
+      WHERE LOWER(o.status) IN ('completed', 'pending')
         AND o.created_at >= ${startDate}
         AND o.created_at <= ${endDate}
-      GROUP BY DATE_FORMAT(o.created_at, '%Y-%m')
+      GROUP BY DATE_FORMAT(CONVERT_TZ(o.created_at, '+00:00', '+05:30'), '%Y-%m')
       ORDER BY date ASC
     `;
     return result.map(row => ({
@@ -23,15 +23,15 @@ const getSalesReport = async (startDate, endDate, groupBy = 'date') => {
   } else {
     const result = await prisma.$queryRaw`
       SELECT 
-        DATE(o.created_at) AS date,
+        DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) AS date,
         COALESCE(SUM(o.total_amount), 0) AS sales,
         COALESCE(SUM(o.tax_amount), 0) AS tax,
         COUNT(o.id) AS orders_count
       FROM \`orders\` o
-      WHERE LOWER(o.status) = 'completed'
+      WHERE LOWER(o.status) IN ('completed', 'pending')
         AND o.created_at >= ${startDate}
         AND o.created_at <= ${endDate}
-      GROUP BY DATE(o.created_at)
+      GROUP BY DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30'))
       ORDER BY date ASC
     `;
     return result.map(row => ({
@@ -52,7 +52,7 @@ const getProductSalesReport = async (startDate, endDate) => {
     FROM \`order_items\` oi
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
-    WHERE LOWER(o.status) = 'completed'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY p.id, p.name
@@ -72,7 +72,7 @@ const getCategorySalesReport = async (startDate, endDate) => {
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
     JOIN \`categories\` c ON p.category_id = c.id
-    WHERE LOWER(o.status) = 'completed'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY c.id, c.name
@@ -93,7 +93,7 @@ const getPaymentReport = async (startDate, endDate) => {
     where: {
       status: 'PAID',
       order: {
-        status: { equals: 'COMPLETED', mode: 'insensitive' },
+        status: { in: ['COMPLETED', 'PENDING'] },
         created_at: {
           gte: startDate,
           lte: endDate
@@ -107,14 +107,14 @@ const getPaymentReport = async (startDate, endDate) => {
 const getTaxReport = async (startDate, endDate) => {
   const result = await prisma.$queryRaw`
     SELECT 
-      DATE(o.created_at) AS date,
+      DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) AS date,
       COALESCE(SUM(o.subtotal), 0) AS total_taxable_amount,
       COALESCE(SUM(o.tax_amount), 0) AS total_tax
     FROM \`orders\` o
-    WHERE LOWER(o.status) = 'completed'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
-    GROUP BY DATE(o.created_at)
+    GROUP BY DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30'))
     ORDER BY date ASC
   `;
   return result.map(row => ({
@@ -129,18 +129,23 @@ const getDailySalesReport = async (year, month) => {
 
   const result = await prisma.$queryRaw`
     SELECT 
-      DATE(o.created_at) AS date,
+      DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) AS date,
       COUNT(o.id) AS total_orders,
+      COALESCE(SUM(o.subtotal), 0) AS total_gross_sale,
       COALESCE(SUM(o.total_amount), 0) AS total_grand_total,
       COALESCE(SUM(o.discount_amount), 0) AS total_discount,
-      COALESCE(SUM(oi.quantity), 0) AS total_items_sold,
+      COALESCE(SUM(oi_agg.total_items), 0) AS total_items_sold,
       COALESCE(SUM(o.tax_amount), 0) AS total_tax
     FROM \`orders\` o
-    LEFT JOIN \`order_items\` oi ON oi.order_id = o.id
-    WHERE LOWER(o.status) = 'completed'
+    LEFT JOIN (
+      SELECT order_id, SUM(quantity) as total_items
+      FROM \`order_items\`
+      GROUP BY order_id
+    ) oi_agg ON oi_agg.order_id = o.id
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
-    GROUP BY DATE(o.created_at)
+    GROUP BY DATE(CONVERT_TZ(o.created_at, '+00:00', '+05:30'))
     ORDER BY date ASC
   `;
 
@@ -151,6 +156,7 @@ const getDailySalesReport = async (year, month) => {
       ...row,
       date: dateStr,
       total_orders: Number(row.total_orders),
+      total_gross_sale: Number(row.total_gross_sale),
       total_grand_total: Number(row.total_grand_total),
       total_discount: Number(row.total_discount),
       total_items_sold: Number(row.total_items_sold),
@@ -193,7 +199,7 @@ const getDailyProductDetails = async (date) => {
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
     LEFT JOIN \`categories\` c ON p.category_id = c.id
-    WHERE LOWER(o.status) = 'completed'
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
     GROUP BY p.id, p.name, c.name
@@ -218,18 +224,23 @@ const getMonthlySalesReport = async (year) => {
 
   const result = await prisma.$queryRaw`
     SELECT 
-      MONTH(o.created_at) AS sale_month,
-      COUNT(DISTINCT o.id) AS total_orders,
-      COALESCE(SUM(oi.quantity), 0) AS total_items_sold,
-      COALESCE(SUM(oi.line_total), 0) AS total_grand_total,
+      MONTH(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) AS sale_month,
+      COUNT(o.id) AS total_orders,
+      COALESCE(SUM(o.subtotal), 0) AS total_gross_sale,
+      COALESCE(SUM(o.total_amount), 0) AS total_grand_total,
       COALESCE(SUM(o.tax_amount), 0) AS total_tax,
-      COALESCE(SUM(o.discount_amount), 0) AS total_discount
+      COALESCE(SUM(o.discount_amount), 0) AS total_discount,
+      COALESCE(SUM(oi_agg.total_items), 0) AS total_items_sold
     FROM \`orders\` o
-    LEFT JOIN \`order_items\` oi ON oi.order_id = o.id
-    WHERE LOWER(o.status) = 'completed'
+    LEFT JOIN (
+      SELECT order_id, SUM(quantity) as total_items
+      FROM \`order_items\`
+      GROUP BY order_id
+    ) oi_agg ON oi_agg.order_id = o.id
+    WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
-    GROUP BY MONTH(o.created_at)
+    GROUP BY MONTH(CONVERT_TZ(o.created_at, '+00:00', '+05:30'))
     ORDER BY sale_month ASC
   `;
 
@@ -241,6 +252,7 @@ const getMonthlySalesReport = async (year) => {
       sale_month: monthKey,
       total_orders: Number(row.total_orders),
       total_items_sold: Number(row.total_items_sold),
+      total_gross_sale: Number(row.total_gross_sale),
       total_grand_total: Number(row.total_grand_total),
       total_tax: Number(row.total_tax),
       total_discount: Number(row.total_discount)
@@ -254,6 +266,7 @@ const getMonthlySalesReport = async (year) => {
         sale_month: month,
         total_orders: 0,
         total_items_sold: 0,
+        total_gross_sale: 0,
         total_grand_total: 0,
         total_tax: 0,
         total_discount: 0
@@ -272,14 +285,16 @@ const getMonthlyProductDetails = async (year, month) => {
       COUNT(DISTINCT o.id) AS order_count,
       COALESCE(SUM(oi.quantity), 0) AS total_quantity,
       COALESCE(AVG(oi.unit_price), 0) AS avg_price,
-      COALESCE(SUM(oi.line_total), 0) AS total_amount
+      COALESCE(AVG(oi.gst_percentage), 0) AS tax_rate,
+      COALESCE(SUM(oi.gst_amount), 0) AS tax_amount,
+      COALESCE(SUM(oi.line_total + oi.gst_amount), 0) AS total_amount
     FROM \`orders\` o
     JOIN \`order_items\` oi ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
     JOIN \`categories\` c ON p.category_id = c.id
-    WHERE LOWER(o.status) = 'completed'
-      AND YEAR(o.created_at) = ${year}
-      AND MONTH(o.created_at) = ${month}
+    WHERE LOWER(o.status) IN ('completed', 'pending')
+      AND YEAR(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) = ${year}
+      AND MONTH(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) = ${month}
     GROUP BY c.name, p.name
     ORDER BY total_amount DESC
   `;
@@ -289,6 +304,8 @@ const getMonthlyProductDetails = async (year, month) => {
     order_count: Number(r.order_count),
     total_quantity: Number(r.total_quantity),
     avg_price: Number(r.avg_price),
+    tax_rate: Number(r.tax_rate),
+    tax_amount: Number(r.tax_amount),
     total_amount: Number(r.total_amount)
   }));
 };

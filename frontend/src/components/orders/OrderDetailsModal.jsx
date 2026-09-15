@@ -4,11 +4,16 @@ import { X, Printer, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-re
 import { Receipt } from './Receipt';
 import { InvoiceModal } from './InvoiceModal';
 import clsx from 'clsx';
+import { buildReceiptHtml } from '../../utils/receiptHtml';
+import { useNavigate } from 'react-router-dom';
+import { useCartStore } from '../../store/useCartStore';
 
 export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
   const { data, isLoading, isError } = useOrderDetails(orderId);
   const printRef = useRef(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+  const navigate = useNavigate();
+  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
 
   if (!isOpen) return null;
 
@@ -21,63 +26,55 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
     ? (itemTaxTotal / parseFloat(order.subtotal)) * 100
     : 0;
 
+  const exactTotal = parseFloat(order?.subtotal || 0) - parseFloat(order?.discount_amount || 0) + itemTaxTotal;
+  const roundOff = parseFloat(order?.total_amount || 0) - exactTotal;
+
   // Open a dedicated print popup with the receipt HTML so @media print CSS
   // conflicts with the main page don't cause a blank page.
   const handlePrint = () => {
     if (!order) return;
     const payments = order.payments || [];
-    const receiptHtml = `
-      <!DOCTYPE html><html><head>
-        <title>Receipt - ${order.order_number}</title>
-        <style>
-          body { font-family: 'Courier New', monospace; padding: 16px; max-width: 350px; margin: 0 auto; font-size: 12px; color: #000; }
-          h2 { font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.1em; margin: 0 0 4px 0; }
-          .center { text-align: center; }
-          .divider { border-top: 1px dashed #000; margin: 8px 0; }
-          .row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 11px; }
-          table { width: 100%; border-collapse: collapse; font-size: 11px; }
-          th { text-align: left; padding-bottom: 4px; border-bottom: 1px dashed #000; }
-          th.right, td.right { text-align: right; }
-          th.center, td.center { text-align: center; }
-          td { padding: 3px 0; }
-          .total-row { font-weight: bold; font-size: 14px; }
-          .footer { text-align: center; margin-top: 16px; font-size: 11px; }
-          @media print { body { margin: 0; } }
-        </style>
-      </head><body>
-        <div class="center">
-          <h2>POS Receipt</h2>
-          <p style="margin:2px 0;font-size:11px;">MULTIPACK SUPREME PLASTIC INDUSTRIES</p>
-        </div>
-        <div class="divider"></div>
-        <div class="row"><span>Order No:</span><span><b>${order.order_number}</b></span></div>
-        <div class="row"><span>Date:</span><span>${new Date(order.created_at).toLocaleString('en-IN')}</span></div>
-        ${order.user ? `<div class="row"><span>Cashier:</span><span>${order.user.name}</span></div>` : ''}
-        <div class="divider"></div>
-        <table>
-          <thead><tr><th>Item</th><th class="center">Qty</th><th class="right">Amt</th></tr></thead>
-          <tbody>
-            ${(order.items || []).map(item => `
-              <tr>
-                <td>${item.product?.name || 'Product'}<br/><span style="color:#555;font-size:10px;">@ ₹${parseFloat(item.unit_price).toFixed(2)}</span></td>
-                <td class="center">${item.quantity}</td>
-                <td class="right">₹${parseFloat(item.line_total).toFixed(2)}<br/><span style="color:#555;font-size:10px;">${item.gst_type || 'GST'} ${parseFloat(item.gst_percentage || 0).toFixed(2)}%: ₹${parseFloat(item.gst_amount || 0).toFixed(2)}</span></td>
-              </tr>`).join('')}
-          </tbody>
-        </table>
-        <div class="divider"></div>
-        <div class="row"><span>Subtotal:</span><span>₹${parseFloat(order.subtotal).toFixed(2)}</span></div>
-        <div class="row"><span>Tax:</span><span>₹${parseFloat(order.tax_amount).toFixed(2)}</span></div>
-        <div class="row total-row"><span>TOTAL:</span><span>₹${parseFloat(order.total_amount).toFixed(2)}</span></div>
-        <div class="divider"></div>
-        ${payments.length > 0 ? payments.map(payment => `<div class="row"><span>Payment (${payment.method}):</span><span>₹${parseFloat(payment.amount).toFixed(2)}</span></div>`).join('') : '<div class="row"><span>Payment:</span><span>N/A</span></div>'}
-        <div class="footer"><b>*** THANK YOU ***</b><br/>Please visit again</div>
-      </body></html>`;
+    
+    const paymentLabel = payments.map(p => p.method).join(' + ') || '';
+    const cashAmount = payments.find(p => p.method === 'CASH')?.amount || 0;
+    
+    const receiptHtml = buildReceiptHtml(
+      order.order_number,
+      order.items,
+      parseFloat(order.subtotal),
+      parseFloat(order.tax_amount),
+      parseFloat(order.total_amount),
+      paymentLabel,
+      cashAmount,
+      parseFloat(order.discount_amount || 0),
+      order.created_at
+    );
+      
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     printWindow.document.write(receiptHtml);
     printWindow.document.close();
     printWindow.focus();
     setTimeout(() => { printWindow.print(); printWindow.close(); }, 500);
+  };
+
+  const handleSettle = () => {
+    if (!order) return;
+    
+    // Map order items back to cart items format
+    const cartItems = order.items.map(item => ({
+      product_id: item.product_id,
+      name: item.product?.name || `Product #${item.product_id}`,
+      price: item.unit_price,
+      quantity: item.quantity,
+      gst_type: item.gst_type,
+      gst_percentage: item.gst_percentage
+    }));
+    
+    setItems(cartItems);
+    setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+    setPendingOrderNumber(order.order_number);
+    onClose();
+    navigate('/pos', { state: { autoCheckout: true } });
   };
 
   return (
@@ -92,6 +89,15 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {order && (
               <>
+                {order.status === 'PENDING' && (
+                  <button
+                    onClick={handleSettle}
+                    className="inline-flex items-center rounded-md border border-transparent bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-amber-700 focus:outline-none sm:text-sm animate-pulse shadow-amber-500/50"
+                  >
+                    <CheckCircle className="w-4 h-4 mr-1.5" />
+                    Settle Order
+                  </button>
+                )}
                 <button
                   onClick={() => setIsInvoiceOpen(true)}
                   id="order-details-invoice-btn"
@@ -164,6 +170,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Discount</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">GST</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                       </tr>
@@ -177,9 +184,12 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                           <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.quantity}</td>
                           {/* HISTORICAL UNIT PRICE - AUTHORITATIVE */}
                           <td className="px-4 py-3 text-sm text-gray-500 text-right">₹{parseFloat(item.unit_price).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-sm text-gray-500 text-right">
-                            {item.gst_type || 'GST'} {parseFloat(item.gst_percentage || 0).toFixed(2)}%<br />
-                            ₹{parseFloat(item.gst_amount || 0).toFixed(2)}
+                          <td className="px-4 py-3 text-sm text-red-600 text-right">
+                            {parseFloat(item.discount_amount || 0) > 0 ? `-₹${parseFloat(item.discount_amount).toFixed(2)}` : '₹0.00'}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-gray-500 text-right">
+                            CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
+                            SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">₹{parseFloat(item.line_total).toFixed(2)}</td>
                         </tr>
@@ -223,12 +233,28 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                          <span className="text-gray-500">Subtotal:</span>
                          <span className="font-medium text-gray-900">₹{parseFloat(order.subtotal).toFixed(2)}</span>
                        </div>
+                       {parseFloat(order.discount_amount || 0) > 0 && (
+                         <div className="flex justify-between text-red-600">
+                           <span>Discount:</span>
+                           <span className="font-medium">-₹{parseFloat(order.discount_amount).toFixed(2)}</span>
+                         </div>
+                       )}
                        <div className="flex justify-between">
-                         <span className="text-gray-500">GST (item-wise {itemTaxRate.toFixed(2)}%):</span>
-                         <span className="font-medium text-gray-900">₹{itemTaxTotal.toFixed(2)}</span>
+                         <span className="text-gray-500">CGST ({(itemTaxRate / 2).toFixed(2)}%):</span>
+                         <span className="font-medium text-gray-900">₹{(itemTaxTotal / 2).toFixed(2)}</span>
                        </div>
+                       <div className="flex justify-between mt-1">
+                         <span className="text-gray-500">SGST ({(itemTaxRate / 2).toFixed(2)}%):</span>
+                         <span className="font-medium text-gray-900">₹{(itemTaxTotal / 2).toFixed(2)}</span>
+                       </div>
+                       {Math.abs(roundOff) > 0.001 && (
+                         <div className="flex justify-between mt-1">
+                           <span className="text-gray-500">Round Off:</span>
+                           <span className="font-medium text-gray-900">{roundOff > 0 ? '+' : ''}{roundOff.toFixed(2)}</span>
+                         </div>
+                       )}
                        <div className="flex justify-between pt-2 mt-2 border-t border-gray-200">
-                         <span className="font-bold text-gray-900">Total:</span>
+                         <span className="font-bold text-gray-900">Final Total:</span>
                          <span className="font-bold text-gray-900 text-lg">₹{parseFloat(order.total_amount).toFixed(2)}</span>
                        </div>
                      </div>

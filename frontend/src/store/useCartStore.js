@@ -3,6 +3,10 @@ import { create } from 'zustand';
 // Store for managing the POS cart state on the client side
 export const useCartStore = create((set, get) => ({
   items: [],
+  discount: { value: '', type: 'FLAT' }, // type can be 'FLAT' or 'PERCENT'
+  pendingOrderNumber: null,
+
+
   
   addItem: (product) => set((state) => {
     const existingItem = state.items.find((item) => item.product_id === product.id);
@@ -69,7 +73,11 @@ export const useCartStore = create((set, get) => ({
   
 
   
-  clearCart: () => set({ items: [] }),
+  clearCart: () => set({ items: [], discount: { value: '', type: 'FLAT' }, pendingOrderNumber: null }),
+
+  setDiscount: (value, type) => set({ discount: { value, type } }),
+  setPendingOrderNumber: (orderNumber) => set({ pendingOrderNumber: orderNumber }),
+  setItems: (items) => set({ items }),
 
   // Helpers
   getTotalItems: () => get().items.reduce((total, item) => total + item.quantity, 0),

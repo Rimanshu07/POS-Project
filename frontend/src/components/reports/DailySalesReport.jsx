@@ -25,6 +25,11 @@ export const DailySalesReport = () => {
     Boolean(selectedDate)
   );
 
+  const selectedDayData = useMemo(() => {
+    if (!calendarData || !selectedDate) return null;
+    return calendarData.find(d => d.date === selectedDate)?.sale_data;
+  }, [calendarData, selectedDate]);
+
   const calendar = useMemo(() => {
     if (!calendarData) return [];
     
@@ -88,22 +93,37 @@ export const DailySalesReport = () => {
     if (!calendarData) return;
     
     const filteredData = calendarData.filter(d => d.sale_data);
-    const excelData = filteredData.map(day => ({
-      'Date': day.date,
-      'Gross Sale': parseFloat(day.sale_data.total_grand_total).toFixed(2),
-      'Discount': parseFloat(day.sale_data.total_discount).toFixed(2),
-      'Tax': parseFloat(day.sale_data.total_tax).toFixed(2),
-      'Total': parseFloat(day.sale_data.total_grand_total - day.sale_data.total_discount + day.sale_data.total_tax).toFixed(2),
-      'Orders': day.sale_data.total_orders,
-      'Items Sold': day.sale_data.total_items_sold
-    }));
+    const excelData = filteredData.map(day => {
+      const gross = parseFloat(day.sale_data.total_gross_sale);
+      const discount = parseFloat(day.sale_data.total_discount);
+      const tax = parseFloat(day.sale_data.total_tax);
+      const total = parseFloat(day.sale_data.total_grand_total);
+      const roundOff = total - (gross - discount + tax);
+      
+      return {
+        'Date': day.date,
+        'Gross Sale': gross.toFixed(2),
+        'Discount': discount.toFixed(2),
+        'Tax': tax.toFixed(2),
+        'Round Off': roundOff.toFixed(2),
+        'Total': total.toFixed(2),
+        'Orders': day.sale_data.total_orders,
+        'Items Sold': day.sale_data.total_items_sold
+      };
+    });
 
+    const totalGross = filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_gross_sale), 0);
+    const totalDiscount = filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_discount), 0);
+    const totalTax = filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_tax), 0);
+    const totalGrand = filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_grand_total), 0);
+    
     const totalRow = {
       'Date': 'TOTAL',
-      'Gross Sale': filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_grand_total), 0).toFixed(2),
-      'Discount': filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_discount), 0).toFixed(2),
-      'Tax': filteredData.reduce((sum, day) => sum + parseFloat(day.sale_data.total_tax), 0).toFixed(2),
-      'Total': filteredData.reduce((sum, day) => sum + (parseFloat(day.sale_data.total_grand_total) - parseFloat(day.sale_data.total_discount) + parseFloat(day.sale_data.total_tax)), 0).toFixed(2),
+      'Gross Sale': totalGross.toFixed(2),
+      'Discount': totalDiscount.toFixed(2),
+      'Tax': totalTax.toFixed(2),
+      'Round Off': (totalGrand - (totalGross - totalDiscount + totalTax)).toFixed(2),
+      'Total': totalGrand.toFixed(2),
       'Orders': filteredData.reduce((sum, day) => sum + parseInt(day.sale_data.total_orders), 0),
       'Items Sold': filteredData.reduce((sum, day) => sum + parseInt(day.sale_data.total_items_sold), 0)
     };
@@ -127,8 +147,8 @@ export const DailySalesReport = () => {
       'Category': product.category_name || 'Uncategorized',
       'Average Price': Number(product.avg_price || 0).toFixed(2),
       'Quantity': Number(product.total_quantity || 0).toFixed(2),
-      'GST Rate': `${Number(product.tax_rate || 0).toFixed(2)}%`,
-      'GST Amount': Number(product.tax_amount || 0).toFixed(2),
+      'CGST': `${Number(product.tax_rate / 2 || 0).toFixed(2)}% (₹${Number(product.tax_amount / 2 || 0).toFixed(2)})`,
+      'SGST': `${Number(product.tax_rate / 2 || 0).toFixed(2)}% (₹${Number(product.tax_amount / 2 || 0).toFixed(2)})`,
       'Total Amount': Number(product.total_amount || 0).toFixed(2)
     }));
     const worksheet = XLSX.utils.json_to_sheet(rows);
@@ -203,19 +223,26 @@ export const DailySalesReport = () => {
                           <small>Total Orders:</small> {day.sale_data.total_orders}
                         </div>
                         <div className="text-green-700 font-semibold">
-                          <small>Gross Sale:</small> {formatCurrency(day.sale_data.total_grand_total)}
+                          <small>Gross Sale:</small> {formatCurrency(day.sale_data.total_gross_sale)}
                         </div>
                         <div className="text-red-600">
                           <small>Discount:</small> -{formatCurrency(day.sale_data.total_discount)}
                         </div>
+                        <div className="text-info">
+                          <small>Tax:</small> {formatCurrency(day.sale_data.total_tax)}
+                        </div>
+                        <div className="text-gray-500">
+                          <small>Round Off:</small> {(
+                            parseFloat(day.sale_data.total_grand_total) - 
+                            (parseFloat(day.sale_data.total_gross_sale) - parseFloat(day.sale_data.total_discount) + parseFloat(day.sale_data.total_tax))
+                          ).toFixed(2)}
+                        </div>
+                        <div className="text-blue-800 font-bold border-t pt-1 mt-1">
+                          <small>Total:</small> {formatCurrency(day.sale_data.total_grand_total)}
+                        </div>
                         <div className="text-primary">
                           <small>Items:</small> {day.sale_data.total_items_sold}
                         </div>
-                        {day.sale_data.total_tax > 0 && (
-                          <div className="text-info">
-                            <small>Order Tax:</small> {formatCurrency(day.sale_data.total_tax)}
-                          </div>
-                        )}
                       </div>
                     )}
                     {!hasSales && (
@@ -262,9 +289,9 @@ export const DailySalesReport = () => {
                   <table className="min-w-full divide-y divide-gray-200 text-sm">
                     <thead className="bg-gray-50">
                       <tr>
-                        {['Product Name', 'Category', 'Average Price', 'Quantity', 'GST Rate', 'GST Amount', 'Total Amount'].map(header => (
+                        {['Product Name', 'Category', 'Average Price', 'Quantity', 'CGST', 'SGST', 'Total Amount'].map(header => (
                           <th key={header} className={`whitespace-nowrap px-4 py-3 text-xs font-bold uppercase tracking-wider text-gray-700 ${
-                            ['Average Price', 'Quantity', 'GST Rate', 'GST Amount', 'Total Amount'].includes(header) ? 'text-center' : 'text-left'
+                            ['Average Price', 'Quantity', 'CGST', 'SGST', 'Total Amount'].includes(header) ? 'text-center' : 'text-left'
                           }`}>{header}</th>
                         ))}
                       </tr>
@@ -276,12 +303,58 @@ export const DailySalesReport = () => {
                           <td className="px-4 py-3 text-gray-600">{product.category_name || 'Uncategorized'}</td>
                           <td className="px-4 py-3 text-center text-gray-600">{formatCurrency(product.avg_price)}</td>
                           <td className="px-4 py-3 text-center text-gray-600">{Number(product.total_quantity || 0).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-center text-gray-600">{Number(product.tax_rate || 0).toFixed(2)}%</td>
-                          <td className="px-4 py-3 text-right font-semibold text-green-700">{formatCurrency(product.tax_amount)}</td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {Number(product.tax_rate / 2 || 0).toFixed(2)}%<br/>
+                            <span className="text-xs text-gray-500">{formatCurrency(product.tax_amount / 2)}</span>
+                          </td>
+                          <td className="px-4 py-3 text-center text-gray-600">
+                            {Number(product.tax_rate / 2 || 0).toFixed(2)}%<br/>
+                            <span className="text-xs text-gray-500">{formatCurrency(product.tax_amount / 2)}</span>
+                          </td>
                           <td className="px-4 py-3 text-right font-semibold text-green-700">{formatCurrency(product.total_amount)}</td>
                         </tr>
                       ))}
                     </tbody>
+                    <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                      <tr>
+                        <td colSpan="6" className="px-4 py-3 text-right text-sm font-semibold text-gray-600">
+                          Products Total (Gross + Tax):
+                        </td>
+                        <td className="px-4 py-3 text-right text-sm font-bold text-gray-900">
+                          {formatCurrency(productDetails.reduce((s, p) => s + parseFloat(p.total_amount), 0))}
+                        </td>
+                      </tr>
+                      {selectedDayData && parseFloat(selectedDayData.total_discount) > 0 && (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-2 text-right text-sm text-red-600">
+                            Order Discounts:
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-red-600">
+                            -{formatCurrency(selectedDayData.total_discount)}
+                          </td>
+                        </tr>
+                      )}
+                      {selectedDayData && (
+                        <tr>
+                          <td colSpan="6" className="px-4 py-2 text-right text-sm text-gray-500">
+                            Round Off:
+                          </td>
+                          <td className="px-4 py-2 text-right text-sm text-gray-500">
+                            {formatCurrency(parseFloat(selectedDayData.total_grand_total) - (parseFloat(selectedDayData.total_gross_sale) - parseFloat(selectedDayData.total_discount) + parseFloat(selectedDayData.total_tax)))}
+                          </td>
+                        </tr>
+                      )}
+                      {selectedDayData && (
+                        <tr className="bg-gray-100">
+                          <td colSpan="6" className="px-4 py-3 text-right text-base font-bold text-gray-900">
+                            Final Total:
+                          </td>
+                          <td className="px-4 py-3 text-right text-lg font-bold text-blue-700">
+                            {formatCurrency(selectedDayData.total_grand_total)}
+                          </td>
+                        </tr>
+                      )}
+                    </tfoot>
                   </table>
                 </div>
               )}

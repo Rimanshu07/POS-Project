@@ -10,28 +10,21 @@ const createOrderSchema = z.object({
         quantity: z.number().int().positive('Quantity must be at least 1')
       })
     ).min(1, 'Order must contain at least one item'),
-    payment: z.union([
-      z.object({
+    discount_amount: z.number().nonnegative().optional(),
+    payment: z.array(z.object({
       method: z.enum(['CASH', 'CARD', 'UPI', 'NEFT', 'RTGS', 'OTHERS']),
-      amount: z.string().regex(/^\d+(\.\d{1,2})?$/).optional(),
+      amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Payment amount must be valid'),
       amount_tendered: z.string()
         .regex(/^\d+(\.\d{1,2})?$/, 'Amount tendered must be a valid positive number with up to 2 decimal places')
         .optional()
-      }).refine(data => {
-      if (data.method === 'CASH') {
-        return !!data.amount_tendered;
-      }
-      return true;
-    }, {
-      message: "amount_tendered is required for CASH payment",
-      path: ['amount_tendered']
+    })).refine(
+      (payments) => payments.every(p => {
+        if (p.method === 'CASH') return !!p.amount_tendered;
+        return true;
       }),
-      z.array(z.object({
-        method: z.enum(['CASH', 'CARD', 'UPI', 'NEFT', 'RTGS', 'OTHERS']),
-        amount: z.string().regex(/^\d+(\.\d{1,2})?$/, 'Payment amount must be valid')
-      })).min(1)
-    ])
-  }).strict('Unknown fields are not allowed. Discount is not supported in V1.')
+      { message: "amount_tendered is required for CASH payment", path: ['payment'] }
+    ).optional()
+  }).strict('Unknown fields are not allowed.')
 });
 
 // Schema for Order Listing
@@ -40,14 +33,14 @@ const listOrderSchema = z.object({
     page: z.string().regex(/^\d+$/).optional().default('1'),
     limit: z.string().regex(/^\d+$/).optional().default('10'),
     search: z.string().optional(),
-    status: z.enum(['PENDING', 'COMPLETED', 'CANCELLED']).optional(),
-    date_from: z.string().datetime().optional(),
-    date_to: z.string().datetime().optional(),
+    status: z.string().toUpperCase().pipe(z.enum(['PENDING', 'COMPLETED', 'CANCELLED'])).optional(),
+    date_from: z.string().optional(),
+    date_to: z.string().optional(),
     start_date: z.string().optional(),
     end_date: z.string().optional(),
     reference_no: z.string().optional(),
     invoice_no: z.string().optional(),
-    payment_status: z.enum(['PAID', 'PENDING', 'PARTIAL', 'DUE', 'FAILED']).optional()
+    payment_status: z.string().toUpperCase().pipe(z.enum(['PAID', 'PENDING', 'FAILED', 'REFUNDED'])).optional()
   })
 });
 

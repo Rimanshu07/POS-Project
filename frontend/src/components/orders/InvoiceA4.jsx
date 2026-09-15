@@ -29,8 +29,8 @@ export const InvoiceA4 = ({ invoice }) => {
   const taxAmount = parseFloat(invoice.tax_amount || 0);
   const discountAmount = parseFloat(invoice.discount_amount || 0);
   const totalAmount = parseFloat(invoice.total_amount || 0);
-  const grandTotalRounded = Math.round(totalAmount);
-  const roundOff = grandTotalRounded - totalAmount;
+  const exactTotal = subtotal - discountAmount + taxAmount;
+  const roundOff = totalAmount - exactTotal;
   const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
   const payments = invoice.payments || (invoice.payment ? [invoice.payment] : []);
 
@@ -110,8 +110,8 @@ export const InvoiceA4 = ({ invoice }) => {
                     {parseFloat(item.unit_price || 0).toFixed(2)}
                   </td>
                   <td style={{ padding: "9px 12px", textAlign: "right", color: "#374151" }}>
-                    {item.gst_type || "GST"} {parseFloat(item.gst_percentage || 0).toFixed(2)}%
-                    <br />₹{parseFloat(item.gst_amount || 0).toFixed(2)}
+                    CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+                    <br />SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
                   </td>
                   <td style={{ padding: "9px 12px", textAlign: "right", fontWeight: "600", color: "#111827" }}>
                     {parseFloat(item.line_total || 0).toFixed(2)}
@@ -186,8 +186,12 @@ export const InvoiceA4 = ({ invoice }) => {
           {taxAmount > 0 && (
             <>
               <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
-                <span style={{ color: "#6B7280" }}>GST ({parseFloat(invoice.tax_percent || 0).toFixed(2)}%)</span>
-                <span style={{ color: "#374151" }}>{taxAmount.toFixed(2)}</span>
+                <span style={{ color: "#6B7280" }}>CGST</span>
+                <span style={{ color: "#374151" }}>{(taxAmount / 2).toFixed(2)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderBottom: "1px solid #F3F4F6" }}>
+                <span style={{ color: "#6B7280" }}>SGST</span>
+                <span style={{ color: "#374151" }}>{(taxAmount / 2).toFixed(2)}</span>
               </div>
             </>
           )}
@@ -208,7 +212,7 @@ export const InvoiceA4 = ({ invoice }) => {
           >
             <span style={{ fontWeight: "800", fontSize: "16px", color: "#111827" }}>Grand Total</span>
             <span style={{ fontWeight: "800", fontSize: "18px", color: "#111827" }}>
-              ₹{grandTotalRounded}.00
+              ₹{totalAmount.toFixed(2)}
             </span>
           </div>
         </div>

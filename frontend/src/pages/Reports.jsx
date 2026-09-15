@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { getOrders } from '../services/api/orders';
 import { DailySalesReport } from '../components/reports/DailySalesReport';
 import { MonthlySalesReport } from '../components/reports/MonthlySalesReport';
+import { OrderDetailsModal } from '../components/orders/OrderDetailsModal';
 
 const TABS = [
   { id: 'all', label: 'All Sales', icon: TrendingUp },
@@ -42,6 +43,7 @@ const getPaymentStatusClass = (status) => {
 
 export const Reports = () => {
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
   
   const [filters, setFilters] = useState({
     start_date: '',
@@ -92,18 +94,22 @@ export const Reports = () => {
 
     const exportData = ordersData.orders.map(order => {
       const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-      const totalAmount = order.total_amount || 0;
-      const amount = order.subtotal || 0;
-      const gstAmount = order.tax_amount || 0;
+      const totalAmount = parseFloat(order.total_amount || 0);
+      const amount = parseFloat(order.subtotal || 0);
+      const gstAmount = parseFloat(order.tax_amount || 0);
+      const discountAmount = parseFloat(order.discount_amount || 0);
+      const roundOff = totalAmount - (amount - discountAmount + gstAmount);
       const paymentStatus = order.payments?.[0]?.status || 'PENDING';
       
       return {
         'Date': formatDate(order.created_at),
         'Invoice No': order.invoice_no || '-',
         'Items': totalItems,
-        'Total': totalAmount.toFixed(2),
-        'Amount': amount.toFixed(2),
+        'Gross Amount': amount.toFixed(2),
+        'Discount': discountAmount.toFixed(2),
         'GST': gstAmount.toFixed(2),
+        'Round Off': roundOff.toFixed(2),
+        'Total': totalAmount.toFixed(2),
         'Status': order.status,
         'Payment': paymentStatus
       };
@@ -206,6 +212,7 @@ export const Reports = () => {
                   <input
                     type="date"
                     value={filters.start_date}
+                    {...(filters.end_date && { max: filters.end_date })}
                     onChange={(e) => handleFilterChange('start_date', e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
@@ -215,6 +222,7 @@ export const Reports = () => {
                   <input
                     type="date"
                     value={filters.end_date}
+                    {...(filters.start_date && { min: filters.start_date })}
                     onChange={(e) => handleFilterChange('end_date', e.target.value)}
                     className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-400"
                   />
@@ -239,8 +247,8 @@ export const Reports = () => {
                     <option value="">All</option>
                     <option value="paid">Paid</option>
                     <option value="pending">Pending</option>
-                    <option value="partial">Partial</option>
-                    <option value="due">Due</option>
+                    <option value="failed">Failed</option>
+                    <option value="refunded">Refunded</option>
                   </select>
                 </div>
                 <div className="flex items-end gap-2">
@@ -279,7 +287,7 @@ export const Reports = () => {
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Invoice No</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Items</th>
                       <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Total</th>
-                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Amount + GST</th>
+                      <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Financials</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Status</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Payment</th>
                     </tr>
@@ -300,13 +308,19 @@ export const Reports = () => {
                     ) : (
                       ordersData.orders.map((order) => {
                         const totalItems = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-                        const totalAmount = order.total_amount || 0;
-                        const amount = order.subtotal || 0;
-                        const gstAmount = order.tax_amount || 0;
+                        const totalAmount = parseFloat(order.total_amount || 0);
+                        const amount = parseFloat(order.subtotal || 0);
+                        const gstAmount = parseFloat(order.tax_amount || 0);
+                        const discountAmount = parseFloat(order.discount_amount || 0);
+                        const roundOff = totalAmount - (amount - discountAmount + gstAmount);
                         const paymentStatus = order.payments?.[0]?.status || 'PENDING';
                         
                         return (
-                          <tr key={order.id} className="hover:bg-gray-50">
+                          <tr 
+                            key={order.id} 
+                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                            onClick={() => setSelectedOrderId(order.id)}
+                          >
                             <td className="px-4 py-3 text-sm text-gray-900">
                               <div>{formatDate(order.created_at)}</div>
                               <small className="text-gray-500">{formatTime(order.created_at)}</small>
@@ -315,8 +329,10 @@ export const Reports = () => {
                             <td className="px-4 py-3 text-sm text-gray-600 text-center">{totalItems}</td>
                             <td className="px-4 py-3 text-sm font-bold text-green-700 text-right">{formatCurrency(totalAmount)}</td>
                             <td className="px-4 py-3 text-sm text-right">
-                              <div className="font-medium text-gray-900">Amount: {formatCurrency(amount)}</div>
+                              <div className="font-medium text-gray-900">Gross: {formatCurrency(amount)}</div>
+                              {discountAmount > 0 && <div className="text-xs text-red-600">Disc: -{formatCurrency(discountAmount)}</div>}
                               <div className="text-xs text-indigo-600">GST: {formatCurrency(gstAmount)}</div>
+                              <div className="text-xs text-gray-500">Round: {formatCurrency(roundOff)}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
@@ -365,6 +381,15 @@ export const Reports = () => {
         {activeTab === 'daily' && <DailySalesReport />}
         {activeTab === 'monthly' && <MonthlySalesReport />}
       </div>
+
+      {/* Order Details Modal */}
+      {selectedOrderId && (
+        <OrderDetailsModal
+          isOpen={!!selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
+        />
+      )}
     </div>
   );
 };

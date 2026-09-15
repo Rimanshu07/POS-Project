@@ -20,10 +20,16 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { InvoiceModal } from '../components/orders/InvoiceModal';
+import { OrderDetailsModal } from '../components/orders/OrderDetailsModal';
+import { CheckCircle, Loader2 } from 'lucide-react';
+import { getOrderById } from '../services/api/orders';
+import { useCartStore } from '../store/useCartStore';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
+  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
   const [filterPreset, setFilterPreset] = useState('today');
+  const [isSettlingId, setIsSettlingId] = useState(null);
   
   // Data hooks
   const { data: dashboardData, isLoading: isLoadingDash } = useDashboard({ preset: filterPreset });
@@ -32,6 +38,7 @@ export const Dashboard = () => {
   const { data: ordersData, isLoading: isLoadingOrders } = useOrders({ limit: 5 });
 
   const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const [selectedOrderId, setSelectedOrderId] = useState(null);
 
   // Cards Data Setup
   const cards = [
@@ -66,6 +73,34 @@ export const Dashboard = () => {
       onClick: () => navigate('/pos')
     }
   ];
+
+  const handleDirectSettle = async (orderId) => {
+    setIsSettlingId(orderId);
+    try {
+      const response = await getOrderById(orderId);
+      const order = response.data?.order || response.order;
+      if (!order) throw new Error("Order not found");
+      
+      const cartItems = order.items.map(item => ({
+        product_id: item.product_id,
+        name: item.product?.name || item.name || `Product #${item.product_id}`,
+        price: item.unit_price,
+        quantity: item.quantity,
+        gst_type: item.gst_type,
+        gst_percentage: item.gst_percentage
+      }));
+      
+      setItems(cartItems);
+      setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+      setPendingOrderNumber(order.order_number);
+      navigate('/pos', { state: { autoCheckout: true } });
+    } catch (error) {
+      console.error('Failed to settle directly', error);
+      setSelectedOrderId(orderId); // Fallback to details modal
+    } finally {
+      setIsSettlingId(null);
+    }
+  };
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">
@@ -150,7 +185,7 @@ export const Dashboard = () => {
                 <th className="px-6 py-4">Invoice No</th>
                 <th className="px-6 py-4">ITEMS</th>
                 <th className="px-6 py-4">TOTAL</th>
-                <th className="px-6 py-4">AMOUNT + GST</th>
+                <th className="px-6 py-4">FINANCIALS</th>
                 <th className="px-6 py-4">PAYMENT STATUS</th>
                 <th className="px-6 py-4 text-right">ACTION</th>
               </tr>
@@ -173,33 +208,63 @@ export const Dashboard = () => {
                   >
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="font-medium text-gray-900">
-                        {format(new Date(order.created_at), "MM/dd/yyyy")}
+                        {format(new Date(order.created_at), "dd/MM/yyyy")}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
-                        {format(new Date(order.created_at), "hh:mm a")}
+                        {format(new Date(order.created_at), "hh:mm a").toLowerCase()}
                       </div>
                     </td>
                     <td className="px-6 py-4 font-semibold text-gray-700">
                       {order.order_number}
                     </td>
                     <td className="px-6 py-4 text-center font-medium">
-                      {order.items?.length || 0}
+                      {order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}
                     </td>
                     <td className="px-6 py-4 text-indigo-600 font-bold">
-                      ₹{order.total_amount}
+                      ₹{Number(order.total_amount || 0).toFixed(2)}
                     </td>
                     <td className="px-6 py-4 text-gray-900 font-medium">
-                      <div>Amount: ₹{Number(order.subtotal || 0).toFixed(2)}</div>
+                      <div className="font-medium text-gray-900">Gross: ₹{Number(order.subtotal || 0).toFixed(2)}</div>
+                      {Number(order.discount_amount || 0) > 0 && <div className="text-xs text-red-600">Disc: -₹{Number(order.discount_amount || 0).toFixed(2)}</div>}
                       <div className="text-xs text-indigo-600">GST: ₹{Number(order.tax_amount || 0).toFixed(2)}</div>
+                      <div className="text-xs text-gray-500">Round: ₹{(
+                        Number(order.total_amount || 0) - 
+                        (Number(order.subtotal || 0) - Number(order.discount_amount || 0) + Number(order.tax_amount || 0))
+                      ).toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-emerald-100 text-emerald-800">
-                        Paid
-                      </span>
+                      {order.status === 'COMPLETED' ? (
+                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-emerald-100 text-emerald-800">
+                          Paid
+                        </span>
+                      ) : order.status === 'PENDING' ? (
+                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-yellow-100 text-yellow-800">
+                          Pending
+                        </span>
+                      ) : (
+                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-red-100 text-red-800">
+                          {order.status}
+                        </span>
+                      )}
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right whitespace-nowrap">
+                      {order.status === 'PENDING' && (
+                        <button
+                          onClick={() => handleDirectSettle(order.id)}
+                          disabled={isSettlingId === order.id}
+                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70 disabled:animate-none"
+                          title="Settle Payment"
+                        >
+                          {isSettlingId === order.id ? (
+                            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                          ) : (
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                          )}
+                          Settle
+                        </button>
+                      )}
                       <button
-                        onClick={() => setSelectedInvoiceId(order.id)}
+                        onClick={() => setSelectedOrderId(order.id)}
                         className="p-1.5 bg-indigo-50 text-indigo-600 rounded-md hover:bg-indigo-100 transition-modern inline-flex items-center justify-center"
                         title="View Details"
                       >
@@ -237,6 +302,14 @@ export const Dashboard = () => {
           isOpen={!!selectedInvoiceId}
           onClose={() => setSelectedInvoiceId(null)}
           orderId={selectedInvoiceId}
+        />
+      )}
+
+      {selectedOrderId && (
+        <OrderDetailsModal
+          isOpen={!!selectedOrderId}
+          onClose={() => setSelectedOrderId(null)}
+          orderId={selectedOrderId}
         />
       )}
     </div>

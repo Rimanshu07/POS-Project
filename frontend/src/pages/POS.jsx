@@ -32,8 +32,7 @@ export const POS = () => {
 
   const productParams = {
     is_active: "true",
-    ...(searchQuery.trim() && { search: searchQuery.trim() }),
-    ...(selectedCategory !== null && { category_id: selectedCategory }),
+    ...(searchQuery.trim() ? { search: searchQuery.trim() } : (selectedCategory !== null ? { category_id: selectedCategory } : {})),
   };
 
   const {
@@ -247,7 +246,12 @@ export const POS = () => {
                       type="text"
                       placeholder="name, code, barcode..."
                       value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      onChange={(e) => {
+                        setSearchQuery(e.target.value);
+                        if (e.target.value.trim() !== '') {
+                          setSelectedCategory(null); // Switch to All categories when searching
+                        }
+                      }}
                       className="block w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm shadow-sm transition-shadow"
                     />
                   </div>
@@ -265,7 +269,10 @@ export const POS = () => {
                         (a, b) => a.name.localeCompare(b.name),
                       )}
                       selectedCategory={selectedCategory}
-                      onSelectCategory={setSelectedCategory}
+                      onSelectCategory={(categoryId) => {
+                        setSelectedCategory(categoryId);
+                        setSearchQuery(''); // Clear search when a specific category is clicked
+                      }}
                     />
                   </div>
                 )}

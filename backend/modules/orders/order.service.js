@@ -34,8 +34,9 @@ const createOrder = async (orderData, userId) => {
         
         const productsMap = new Map(dbProducts.map(p => [p.id, p]));
 
+        let totalDiscount = new Prisma.Decimal(orderData.discount_amount || 0);
         let subtotal = new Prisma.Decimal(0);
-        const orderItems = [];
+        const preDiscountItems = [];
 
         for (const item of orderData.items) {
           const dbProduct = productsMap.get(item.product_id);
@@ -50,43 +51,70 @@ const createOrder = async (orderData, userId) => {
           const lineTotal = dbProduct.price.mul(quantity);
           subtotal = subtotal.add(lineTotal);
 
-          const gstPercentage = new Prisma.Decimal(dbProduct.gst_percentage || 0);
-          const gstAmount = lineTotal.mul(gstPercentage).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-          orderItems.push({
+          preDiscountItems.push({
             product_id: dbProduct.id,
             quantity: item.quantity,
-            unit_price: dbProduct.price, // Snapshot of current price
-            discount_amount: new Prisma.Decimal(0), // No discounts in V1 Phase 6
+            unit_price: dbProduct.price,
             line_total: lineTotal,
             gst_type: dbProduct.gst_type || 'GST',
-            gst_percentage: gstPercentage,
-            gst_amount: gstAmount
+            gst_percentage: new Prisma.Decimal(dbProduct.gst_percentage || 0)
           });
         }
+
+        // Distribute order discount proportionally to items
+        const orderItems = preDiscountItems.map(item => {
+          let itemDiscount = new Prisma.Decimal(0);
+          if (subtotal.gt(0) && totalDiscount.gt(0)) {
+            itemDiscount = item.line_total.mul(totalDiscount).div(subtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          }
+          const discountedLineTotal = item.line_total.sub(itemDiscount);
+          const gstAmount = discountedLineTotal.mul(item.gst_percentage).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          
+          return {
+            ...item,
+            discount_amount: itemDiscount,
+            gst_amount: gstAmount
+          };
+        });
 
         // 2. Financial Calculations
         const taxAmount = orderItems.reduce((sum, item) => sum.add(item.gst_amount), new Prisma.Decimal(0))
           .toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-        const taxPercent = subtotal.isZero()
+        const discountedSubtotal = subtotal.sub(totalDiscount);
+        const taxPercent = discountedSubtotal.isZero()
           ? new Prisma.Decimal(0)
-          : taxAmount.mul(100).div(subtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-        const totalAmount = subtotal.add(taxAmount).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+          : taxAmount.mul(100).div(discountedSubtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        const exactTotal = discountedSubtotal.add(taxAmount);
+        // Default Rounding: below 0.5 down, >= 0.5 up
+        let totalAmount = new Prisma.Decimal(Math.round(exactTotal.toNumber()));
 
         const payments = Array.isArray(orderData.payment)
           ? orderData.payment
-          : [{
-              method: orderData.payment.method,
-              amount: orderData.payment.method === 'CASH'
-                ? orderData.payment.amount_tendered
-                : totalAmount.toFixed(2)
-            }];
+          : [];
+          
         const paidAmount = payments.reduce(
           (sum, payment) => sum.add(new Prisma.Decimal(payment.amount)),
           new Prisma.Decimal(0)
         );
+        
+        let orderStatus = 'COMPLETED';
         if (paidAmount.lt(totalAmount)) {
-          throw new AppError('Payment amount is less than total amount', 'VALIDATION_ERROR', 400);
+          if (paidAmount.isZero()) {
+            orderStatus = 'PENDING';
+          } else {
+             // If they paid an amount close to exactTotal (at least the floor of exactTotal), accept it and adjust totalAmount so the difference becomes round-off.
+             const floorTotal = new Prisma.Decimal(Math.floor(exactTotal.toNumber()));
+             if (paidAmount.gte(floorTotal)) {
+               totalAmount = paidAmount;
+             } else {
+               throw new AppError('Partial payments are not supported. Either pay full amount or mark as Pay Later.', 'VALIDATION_ERROR', 400);
+             }
+          }
+        } else if (paidAmount.gt(totalAmount) && paidAmount.lt(totalAmount.add(1))) {
+          // If they paid slightly more (within 1 rupee) and it's exact change for them, let's treat the overpayment as round-off if they want the bill to match payment exactly.
+          // Actually, if paidAmount > totalAmount, it usually means "Change" is returned. We keep totalAmount as rounded, and calculate change.
         }
+        
         const cashPayment = payments.find(payment => payment.method === 'CASH');
         const changeAmount = cashPayment && paidAmount.gt(totalAmount)
           ? paidAmount.sub(totalAmount)
@@ -95,58 +123,103 @@ const createOrder = async (orderData, userId) => {
         // 3. Payment Validation
         // 4. Order Number Generation / Assignment
         let orderNumber = orderData.order_number;
+        let existingOrder = null;
         if (!orderNumber || String(orderNumber).trim() === '') {
           const today = new Date();
           const datePrefix = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
           orderNumber = await orderRepo.generateOrderNumber(tx, datePrefix);
+        } else {
+          existingOrder = await tx.order.findUnique({ where: { order_number: String(orderNumber).trim() } });
+          if (existingOrder && existingOrder.status !== 'PENDING') {
+            throw new AppError('Only PENDING orders can be edited or settled.', 'VALIDATION_ERROR', 400);
+          }
         }
 
-        // 5. Database Inserts
-        const newOrder = await tx.order.create({
-          data: {
-            order_number: orderNumber,
-            invoice_no: orderNumber,
-            reference_no: orderNumber,
-            status: 'COMPLETED',
-            subtotal: subtotal,
-            discount_amount: new Prisma.Decimal(0), // Fixed to 0.00
-            tax_percent: taxPercent,
-            tax_amount: taxAmount,
-            total_amount: totalAmount,
-            created_by: userId,
-            items: {
-              create: orderItems
-            },
-            payments: {
-              create: payments.map(payment => ({
-                method: payment.method,
-                amount: new Prisma.Decimal(payment.amount),
-                status: 'PAID'
-              }))
-            }
-          },
-          include: {
-            items: {
-              include: {
-                product: { select: { id: true, name: true } }
+        // 5. Database Inserts / Updates
+        let finalOrder;
+        
+        if (existingOrder) {
+          // Update existing pending order
+          await tx.orderItem.deleteMany({ where: { order_id: existingOrder.id } });
+          await tx.payment.deleteMany({ where: { order_id: existingOrder.id } });
+          
+          finalOrder = await tx.order.update({
+            where: { id: existingOrder.id },
+            data: {
+              status: orderStatus,
+              subtotal: subtotal,
+              discount_amount: totalDiscount,
+              tax_percent: taxPercent,
+              tax_amount: taxAmount,
+              total_amount: totalAmount,
+              items: {
+                create: orderItems
+              },
+              payments: {
+                create: payments.map(payment => ({
+                  method: payment.method,
+                  amount: new Prisma.Decimal(payment.amount),
+                  status: 'PAID'
+                }))
               }
             },
-            payments: true
-          }
-        });
+            include: {
+              items: {
+                include: {
+                  product: { select: { id: true, name: true } }
+                }
+              },
+              payments: true
+            }
+          });
+        } else {
+          // Create new order
+          finalOrder = await tx.order.create({
+            data: {
+              order_number: orderNumber,
+              invoice_no: orderNumber,
+              reference_no: orderNumber,
+              status: orderStatus,
+              subtotal: subtotal,
+              discount_amount: totalDiscount,
+              tax_percent: taxPercent,
+              tax_amount: taxAmount,
+              total_amount: totalAmount,
+              created_by: userId,
+              items: {
+                create: orderItems
+              },
+              payments: {
+                create: payments.map(payment => ({
+                  method: payment.method,
+                  amount: new Prisma.Decimal(payment.amount),
+                  status: 'PAID'
+                }))
+              }
+            },
+            include: {
+              items: {
+                include: {
+                  product: { select: { id: true, name: true } }
+                }
+              },
+              payments: true
+            }
+          });
+        }
 
         await tx.auditLog.create({
           data: {
             user_id: userId,
             action: 'ORDER_CREATED',
             entity: 'ORDER',
-            entity_id: newOrder.id,
-            metadata: JSON.stringify({ order_number: orderNumber, total: totalAmount.toString() })
+            entity_id: finalOrder.id,
+            metadata: JSON.stringify({ order_number: orderNumber, total: totalAmount.toString(), updated: !!existingOrder })
           }
         });
 
         return {
-          order: newOrder,
+          order: finalOrder,
           change_amount: changeAmount.gt(0) ? changeAmount.toFixed(2) : undefined
         };
       });

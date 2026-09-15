@@ -6,6 +6,8 @@ const listOrders = asyncHandler(async (req, res) => {
   const limit = parseInt(req.query.limit || '10', 10);
   const skip = (page - 1) * limit;
   const { search, status, date_from, date_to, reference_no, invoice_no, payment_status } = req.query;
+  console.log("DEBUG getOrders QUERY:", req.query);
+  require('fs').appendFileSync('debug_query.json', JSON.stringify(req.query) + '\n');
 
   const result = await orderService.getOrders({
     skip,

@@ -12,7 +12,11 @@ const findAll = async ({ skip, take, search, status, date_from, date_to, referen
   const where = {};
   
   if (status) {
-    where.status = status;
+    const validOrderStatuses = ['PENDING', 'COMPLETED', 'CANCELLED'];
+    const s = status.toUpperCase();
+    if (validOrderStatuses.includes(s)) {
+      where.status = s;
+    }
   }
   if (search) {
     where.order_number = { contains: search };
@@ -24,17 +28,35 @@ const findAll = async ({ skip, take, search, status, date_from, date_to, referen
     where.invoice_no = { contains: invoice_no };
   }
   if (payment_status) {
-    where.payments = {
-      some: {
-        status: payment_status.toUpperCase()
+    const validPaymentStatuses = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
+    const pStatus = payment_status.toUpperCase();
+    if (validPaymentStatuses.includes(pStatus)) {
+      if (pStatus === 'PENDING') {
+        where.payments = {
+          none: {
+            status: 'PAID'
+          }
+        };
+      } else {
+        where.payments = {
+          some: {
+            status: pStatus
+          }
+        };
       }
-    };
+    }
   }
   
   if (date_from || date_to) {
     where.created_at = {};
-    if (date_from) where.created_at.gte = new Date(date_from);
-    if (date_to) where.created_at.lte = new Date(date_to);
+    if (date_from) {
+      where.created_at.gte = new Date(date_from.trim());
+    }
+    if (date_to) {
+      const dTo = new Date(date_to.trim());
+      dTo.setDate(dTo.getDate() + 1);
+      where.created_at.lt = dTo;
+    }
   }
 
   const [orders, total] = await Promise.all([

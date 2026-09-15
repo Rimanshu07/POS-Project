@@ -1,19 +1,43 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useCartStore } from '../../store/useCartStore';
 import { Trash2, Plus, Minus, ShoppingCart } from 'lucide-react';
 import { CheckoutModal } from './CheckoutModal';
 
 export const Cart = () => {
-  const { items, removeItem, incrementQuantity, decrementQuantity, updateQuantity, updatePrice, clearCart, getSubtotal } = useCartStore();
+  const { items, removeItem, incrementQuantity, decrementQuantity, updateQuantity, updatePrice, clearCart, getSubtotal, discount, setDiscount } = useCartStore();
   const [isCheckoutModalOpen, setIsCheckoutModalOpen] = useState(false);
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (location.state?.autoCheckout && items.length > 0) {
+      setIsCheckoutModalOpen(true);
+      // Clear state so it doesn't reopen unnecessarily
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location.state, items.length, navigate]);
 
   // Frontend calculation for display purposes only.
-  // Backend is the authoritative source of truth.
   const subtotal = getSubtotal();
-  const taxAmount = items.reduce((sum, item) => (
-    sum + (parseFloat(item.price) * item.quantity * parseFloat(item.gst_percentage || 0) / 100)
-  ), 0);
-  const total = subtotal + taxAmount;
+  const discountAmount = discount.type === 'FLAT' 
+    ? parseFloat(discount.value || 0) 
+    : subtotal * (parseFloat(discount.value || 0) / 100);
+    
+  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
+  
+  const taxAmount = items.reduce((sum, item) => {
+    const lineTotal = parseFloat(item.price) * item.quantity;
+    const proportion = subtotal > 0 ? lineTotal / subtotal : 0;
+    const itemDiscount = discountAmount * proportion;
+    const discountedLine = lineTotal - itemDiscount;
+    return sum + (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
+  }, 0);
+
+  const exactTotal = discountedSubtotal + taxAmount;
+  const roundedTotal = Math.round(exactTotal);
+  const roundOff = roundedTotal - exactTotal;
+  const total = exactTotal;
   const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
@@ -107,10 +131,48 @@ export const Cart = () => {
           <span>Subtotal</span>
           <span className="tabular-nums text-[#24231F]">₹{subtotal.toFixed(2)}</span>
         </div>
-        <div className="flex justify-between text-xs text-[#78766D] mb-2 sm:text-sm sm:mb-3">
-          <span>Tax</span>
-          <span className="tabular-nums text-[#24231F]">₹{taxAmount.toFixed(2)}</span>
+        <div className="flex items-center justify-between text-xs text-[#78766D] mb-2 sm:text-sm sm:mb-2">
+          <span>Discount</span>
+          <div className="flex items-center gap-2">
+            <div className="flex bg-[#F1EFE8] rounded-md p-0.5">
+              <button 
+                className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${discount.type === 'FLAT' ? 'bg-white shadow-sm text-[#0E6B4F]' : 'text-gray-500'}`}
+                onClick={() => setDiscount(discount.value, 'FLAT')}
+              >
+                ₹
+              </button>
+              <button 
+                className={`px-2 py-0.5 rounded-sm text-[10px] font-bold ${discount.type === 'PERCENT' ? 'bg-white shadow-sm text-[#0E6B4F]' : 'text-gray-500'}`}
+                onClick={() => setDiscount(discount.value, 'PERCENT')}
+              >
+                %
+              </button>
+            </div>
+            <input 
+              type="number" 
+              min="0"
+              value={discount.value}
+              onChange={e => setDiscount(e.target.value, discount.type)}
+              className="w-16 text-right bg-transparent border-b border-dashed border-[#D9D6CB] focus:outline-none focus:border-[#0E6B4F] focus:text-[#0E6B4F] tabular-nums"
+              placeholder="0"
+            />
+          </div>
         </div>
+        {discountAmount > 0 && (
+          <div className="flex justify-between text-xs text-[#A23B2E] mb-2 sm:text-sm sm:mb-3">
+            <span>Discount Amount</span>
+            <span className="tabular-nums">-₹{discountAmount.toFixed(2)}</span>
+          </div>
+        )}
+        <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
+          <span>CGST</span>
+          <span className="tabular-nums text-[#24231F]">₹{(taxAmount / 2).toFixed(2)}</span>
+        </div>
+        <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
+          <span>SGST</span>
+          <span className="tabular-nums text-[#24231F]">₹{(taxAmount / 2).toFixed(2)}</span>
+        </div>
+
         <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-[#E5E2D9] mb-2.5 sm:pt-3 sm:mb-4">
           <span className="text-sm font-semibold text-[#24231F]">Total</span>
           <span className="text-xl font-bold text-[#24231F] tabular-nums sm:text-2xl">₹{total.toFixed(2)}</span>
@@ -138,7 +200,7 @@ export const Cart = () => {
         <CheckoutModal
           isOpen={isCheckoutModalOpen}
           onClose={() => setIsCheckoutModalOpen(false)}
-          total={total.toFixed(2)}
+          total={roundedTotal.toFixed(2)}
         />
       )}
     </div>

@@ -22,8 +22,8 @@ export const Receipt = ({ order }) => {
   const discountAmount = parseFloat(order.discount_amount || 0);
   const totalAmount = parseFloat(order.total_amount || 0);
   const totalQty = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
-  const grandTotalRounded = Math.round(totalAmount);
-  const roundOff = (grandTotalRounded - totalAmount).toFixed(2);
+  const exactTotal = subtotal - discountAmount + taxAmount;
+  const roundOff = (totalAmount - exactTotal).toFixed(2);
 
   return (
     <div
@@ -109,7 +109,8 @@ export const Receipt = ({ order }) => {
             <span style={{ textAlign: "right" }}>{parseFloat(item.line_total || 0).toFixed(2)}</span>
           </div>
           <div style={{ fontSize: "10px", paddingLeft: "4px", color: "#333" }}>
-            {item.gst_type || "GST"} {parseFloat(item.gst_percentage || 0).toFixed(2)}%: ₹{parseFloat(item.gst_amount || 0).toFixed(2)}
+            CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
+            SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
           </div>
         </React.Fragment>
       ))}
@@ -135,8 +136,12 @@ export const Receipt = ({ order }) => {
         {taxAmount > 0 && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
-              <span>GST ({parseFloat(order.tax_percent || 0).toFixed(2)}%)</span>
-              <span>{taxAmount.toFixed(2)}</span>
+              <span>CGST</span>
+              <span>{(taxAmount / 2).toFixed(2)}</span>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
+              <span>SGST</span>
+              <span>{(taxAmount / 2).toFixed(2)}</span>
             </div>
           </>
         )}
@@ -152,7 +157,7 @@ export const Receipt = ({ order }) => {
         </div>
         <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: "13px" }}>
           <span>Grand Total</span>
-          <span>₹{grandTotalRounded}.00</span>
+          <span>₹{totalAmount.toFixed(2)}</span>
         </div>
       </div>
 
