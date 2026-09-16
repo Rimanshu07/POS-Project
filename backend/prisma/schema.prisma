@@ -101,6 +101,8 @@ model Order {
   customer_name   String?
   status          OrderStatus @default(PENDING)
   subtotal        Decimal     @default(0) @db.Decimal(12, 2)
+  discount_type   String      @default("FLAT")
+  discount_rate   Decimal     @default(0) @db.Decimal(12, 2)
   discount_amount Decimal     @default(0) @db.Decimal(12, 2)
   tax_percent     Decimal     @default(0) @db.Decimal(12, 2)
   tax_amount      Decimal     @default(0) @db.Decimal(12, 2)

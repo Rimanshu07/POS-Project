@@ -12,10 +12,37 @@ const findAll = async ({ skip, take, search, status, date_from, date_to, referen
   const where = {};
   
   if (status) {
-    const validOrderStatuses = ['PENDING', 'COMPLETED', 'CANCELLED'];
     const s = status.toUpperCase();
-    if (validOrderStatuses.includes(s)) {
-      where.status = s;
+    if (s === 'CANCELLED') {
+      where.status = 'CANCELLED';
+    } else if (s === 'COMPLETED') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        WHERE o.status = 'COMPLETED'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) >= o.total_amount
+      `;
+      where.id = { in: result.map(r => r.id) };
+    } else if (s === 'PARTIAL') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        WHERE o.status = 'COMPLETED'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) > 0 AND COALESCE(SUM(p.amount), 0) < o.total_amount
+      `;
+      where.id = { in: result.map(r => r.id) };
+    } else if (s === 'PENDING') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        WHERE o.status = 'COMPLETED'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) = 0
+      `;
+      const pendingStatusOrders = await prisma.order.findMany({ where: { status: 'PENDING' }, select: { id: true } });
+      where.id = { in: [...result.map(r => r.id), ...pendingStatusOrders.map(r => r.id)] };
     }
   }
   if (search) {
@@ -28,22 +55,33 @@ const findAll = async ({ skip, take, search, status, date_from, date_to, referen
     where.invoice_no = { contains: invoice_no };
   }
   if (payment_status) {
-    const validPaymentStatuses = ['PENDING', 'PAID', 'FAILED', 'REFUNDED'];
     const pStatus = payment_status.toUpperCase();
-    if (validPaymentStatuses.includes(pStatus)) {
-      if (pStatus === 'PENDING') {
-        where.payments = {
-          none: {
-            status: 'PAID'
-          }
-        };
-      } else {
-        where.payments = {
-          some: {
-            status: pStatus
-          }
-        };
-      }
+    if (pStatus === 'PAID') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) >= o.total_amount
+      `;
+      where.id = { ...(where.id || {}), in: result.map(r => r.id) };
+    } else if (pStatus === 'PARTIAL') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) > 0 AND COALESCE(SUM(p.amount), 0) < o.total_amount
+      `;
+      where.id = { ...(where.id || {}), in: result.map(r => r.id) };
+    } else if (pStatus === 'PENDING') {
+      const result = await prisma.$queryRaw`
+        SELECT o.id FROM \`orders\` o
+        LEFT JOIN \`payments\` p ON o.id = p.order_id AND p.status = 'PAID'
+        GROUP BY o.id, o.total_amount
+        HAVING COALESCE(SUM(p.amount), 0) = 0
+      `;
+      where.id = { ...(where.id || {}), in: result.map(r => r.id) };
+    } else if (pStatus === 'FAILED' || pStatus === 'REFUNDED') {
+      where.payments = { some: { status: pStatus } };
     }
   }
   

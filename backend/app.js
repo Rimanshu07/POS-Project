@@ -14,7 +14,12 @@ const reportsRoutes = require('./modules/reports/reports.routes');
 const app = express();
 
 // Security Middleware
-app.use(helmet());
+// Note: contentSecurityPolicy is disabled because this is a pure REST API server
+// that serves only JSON — no HTML pages. Helmet's default CSP (script-src 'none')
+// was propagating to the browser and blocking Vite/React scripts on the frontend.
+app.use(helmet({
+  contentSecurityPolicy: false,
+}));
 const allowedOrigins = [
   process.env.CLIENT_URL,
   'http://localhost:5173',

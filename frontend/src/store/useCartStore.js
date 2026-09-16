@@ -5,6 +5,7 @@ export const useCartStore = create((set, get) => ({
   items: [],
   discount: { value: '', type: 'FLAT' }, // type can be 'FLAT' or 'PERCENT'
   pendingOrderNumber: null,
+  alreadyPaid: 0,
 
 
   
@@ -73,11 +74,13 @@ export const useCartStore = create((set, get) => ({
   
 
   
-  clearCart: () => set({ items: [], discount: { value: '', type: 'FLAT' }, pendingOrderNumber: null }),
+  clearCart: () => set({ items: [], discount: { value: '', type: 'FLAT' }, pendingOrderNumber: null, alreadyPaid: 0, existingPayments: [] }),
 
   setDiscount: (value, type) => set({ discount: { value, type } }),
   setPendingOrderNumber: (orderNumber) => set({ pendingOrderNumber: orderNumber }),
   setItems: (items) => set({ items }),
+  setAlreadyPaid: (amount) => set({ alreadyPaid: amount }),
+  setExistingPayments: (payments) => set({ existingPayments: payments }),
 
   // Helpers
   getTotalItems: () => get().items.reduce((total, item) => total + item.quantity, 0),

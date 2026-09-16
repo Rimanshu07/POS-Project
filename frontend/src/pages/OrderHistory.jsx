@@ -20,13 +20,13 @@ export const OrderHistory = () => {
   const [isSettlingId, setIsSettlingId] = useState(null);
   
   const navigate = useNavigate();
-  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
+  const { setItems, setDiscount, setPendingOrderNumber, setAlreadyPaid, setExistingPayments } = useCartStore();
   
   // Debounce search
   useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedSearch(searchInput);
-      setPage(1); // Reset page on new search
+      setPage(1);
     }, 500);
     return () => clearTimeout(handler);
   }, [searchInput]);
@@ -34,7 +34,7 @@ export const OrderHistory = () => {
   // Handle status change
   const handleStatusChange = (e) => {
     setStatus(e.target.value);
-    setPage(1); // Reset page on filter change
+    setPage(1);
   };
 
   const { data, isLoading, isError, error } = useOrders({
@@ -63,17 +63,78 @@ export const OrderHistory = () => {
         gst_percentage: item.gst_percentage
       }));
       
+      const discountType = order.discount_type || 'FLAT';
+      const discountVal = discountType === 'PERCENT'
+        ? (order.discount_rate !== undefined && order.discount_rate !== null ? parseFloat(order.discount_rate) : '')
+        : (order.discount_amount !== undefined && order.discount_amount !== null ? parseFloat(order.discount_amount) : '');
+      
+      const validPayments = (order.payments || []).filter(p => p.status === 'PAID');
+      const alreadyPaid = validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
       setItems(cartItems);
-      setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+      setDiscount(discountVal, discountType);
       setPendingOrderNumber(order.order_number);
+      setAlreadyPaid(alreadyPaid);
+      setExistingPayments(validPayments);
       navigate('/pos', { state: { autoCheckout: true } });
     } catch (error) {
       console.error('Failed to settle directly', error);
-      setSelectedOrderId(orderId); // Fallback to details modal
+      setSelectedOrderId(orderId);
     } finally {
       setIsSettlingId(null);
     }
   };
+
+  // Status badge helper
+  const getStatusBadge = (order) => {
+    if (order.status === 'CANCELLED') {
+      return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">Cancelled</span>;
+    }
+    
+    const totalPaidAmount = (order.payments || [])
+      .filter(p => p.status === 'PAID')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+    if (totalPaidAmount >= parseFloat(order.total_amount || 0)) {
+      return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-emerald-100 text-emerald-800">Paid</span>;
+    } else if (totalPaidAmount > 0) {
+      return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">Partial</span>;
+    }
+    return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-amber-100 text-amber-800">Pending</span>;
+  };
+
+  // Pagination component used by both layouts
+  const Pagination = ({ compact = false }) => (
+    <div className={clsx(
+      "flex items-center justify-between gap-2",
+      compact ? "py-2" : "bg-white px-4 py-3 border-t border-gray-200 sm:px-6"
+    )}>
+      <p className="text-xs sm:text-sm text-gray-500">
+        {compact
+          ? `Page ${page} of ${meta.totalPages || 1} · ${meta.total} orders`
+          : `Showing page ${meta.page} of ${meta.totalPages || 1} (Total: ${meta.total} orders)`
+        }
+      </p>
+      <div className="flex gap-2">
+        <button
+          onClick={() => setPage(p => Math.max(1, p - 1))}
+          disabled={page === 1}
+          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs sm:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+        >
+          <ChevronLeft className="h-4 w-4 mr-0.5" />
+          Prev
+        </button>
+        <button
+          onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+          disabled={page === meta.totalPages}
+          className="inline-flex items-center px-3 py-1.5 border border-gray-300 text-xs sm:text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
+        >
+          Next
+          <ChevronRight className="h-4 w-4 ml-0.5" />
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="max-w-7xl mx-auto space-y-6">
@@ -85,8 +146,8 @@ export const OrderHistory = () => {
       </div>
 
       {/* Filters and Search */}
-      <div className="flex flex-col sm:flex-row gap-4 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-3 bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <Search className="w-5 h-5 text-gray-400" />
           </div>
@@ -98,8 +159,7 @@ export const OrderHistory = () => {
             className="block w-full pl-10 pr-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow shadow-sm"
           />
         </div>
-        
-        <div className="relative w-full sm:w-48">
+        <div className="relative">
           <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
             <Filter className="w-4 h-4 text-gray-400" />
           </div>
@@ -112,6 +172,7 @@ export const OrderHistory = () => {
             <option value="COMPLETED">Completed</option>
             <option value="CANCELLED">Cancelled</option>
             <option value="PENDING">Pending</option>
+            <option value="PARTIAL">Partial</option>
           </select>
         </div>
       </div>
@@ -120,7 +181,7 @@ export const OrderHistory = () => {
       {isError && (
         <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md">
           <div className="flex items-center">
-            <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+            <AlertCircle className="h-5 w-5 text-red-500 mr-2 flex-shrink-0" />
             <p className="text-sm text-red-700 font-medium">
               Error loading orders: {error?.response?.data?.error?.message || error.message}
             </p>
@@ -128,27 +189,17 @@ export const OrderHistory = () => {
         </div>
       )}
 
-      {/* Data Table */}
-      <div className="bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden">
+      {/* ── DESKTOP TABLE (md and above) ── */}
+      <div className="hidden md:block bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Invoice No
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Date & Time
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Total Amount
-                </th>
-                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Invoice No</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Date & Time</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Total Amount</th>
+                <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-100">
@@ -177,31 +228,32 @@ export const OrderHistory = () => {
                       <div className="text-sm font-semibold text-gray-900">{order.invoice_no || order.order_number}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-500">
-                        {new Date(order.created_at).toLocaleString()}
-                      </div>
+                      <div className="text-sm text-gray-500">{new Date(order.created_at).toLocaleString()}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        ₹{parseFloat(order.total_amount).toFixed(2)}
-                      </div>
+                      <div className="text-sm font-medium text-gray-900">₹{parseFloat(order.total_amount).toFixed(2)}</div>
+                      {(() => {
+                        const totalPaid = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                        const due = parseFloat(order.total_amount || 0) - totalPaid;
+                        if (due > 0 && order.status !== 'CANCELLED') {
+                          return <div className="text-xs font-bold text-red-600 mt-0.5">Due: ₹{due.toFixed(2)}</div>;
+                        }
+                        return null;
+                      })()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={clsx(
-                        "px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full",
-                        order.status === 'COMPLETED' ? "bg-green-100 text-green-800" :
-                        order.status === 'CANCELLED' ? "bg-red-100 text-red-800" :
-                        "bg-yellow-100 text-yellow-800"
-                      )}>
-                        {order.status}
-                      </span>
+                      {getStatusBadge(order)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {order.status === 'PENDING' && (
+                      {(() => {
+                        const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                        const isUnpaid = totalPaidAmount < parseFloat(order.total_amount || 0);
+                        return isUnpaid && order.status !== 'CANCELLED';
+                      })() && (
                         <button
                           onClick={() => handleDirectSettle(order.id)}
                           disabled={isSettlingId === order.id}
-                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70 disabled:animate-none"
+                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70"
                           title="Settle Payment"
                         >
                           {isSettlingId === order.id ? (
@@ -227,54 +279,80 @@ export const OrderHistory = () => {
           </table>
         </div>
 
-        {/* Pagination */}
-        {!isLoading && orders.length > 0 && (
-          <div className="bg-white px-4 py-3 border-t border-gray-200 flex items-center justify-between sm:px-6">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                disabled={page === meta.totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400"
-              >
-                Next
-              </button>
+        {!isLoading && orders.length > 0 && <Pagination />}
+      </div>
+
+      {/* ── MOBILE CARDS (below md) ── */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          [...Array(3)].map((_, i) => (
+            <div key={i} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 animate-pulse space-y-2">
+              <div className="h-4 bg-gray-200 rounded w-2/3" />
+              <div className="h-3 bg-gray-200 rounded w-1/2" />
+              <div className="h-3 bg-gray-200 rounded w-1/3" />
             </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing page <span className="font-medium">{meta.page}</span> of <span className="font-medium">{meta.totalPages || 1}</span> (Total: {meta.total} orders)
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
-                  <button
-                    onClick={() => setPage(p => Math.max(1, p - 1))}
-                    disabled={page === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
-                  >
-                    <span className="sr-only">Previous</span>
-                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                  <button
-                    onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
-                    disabled={page === meta.totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 transition-colors"
-                  >
-                    <span className="sr-only">Next</span>
-                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
-                  </button>
-                </nav>
-              </div>
-            </div>
+          ))
+        ) : orders.length === 0 ? (
+          <div className="bg-white rounded-xl p-6 text-center border border-gray-100 shadow-sm">
+            <FileText className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p className="text-sm font-medium text-gray-900">No orders found</p>
+            <p className="text-xs text-gray-500 mt-1">Try adjusting your search or filters.</p>
           </div>
+        ) : (
+          orders.map((order) => (
+            <div key={order.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              {/* Top row: Invoice + Status */}
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <p className="text-sm font-semibold text-gray-900">{order.invoice_no || order.order_number}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">{new Date(order.created_at).toLocaleString()}</p>
+                </div>
+                {getStatusBadge(order)}
+              </div>
+              {/* Amount */}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-indigo-600">
+                  ₹{parseFloat(order.total_amount).toFixed(2)}
+                </span>
+                {(() => {
+                  const totalPaid = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                  const due = parseFloat(order.total_amount || 0) - totalPaid;
+                  if (due > 0 && order.status !== 'CANCELLED') {
+                    return <span className="text-xs font-bold text-red-600">Due: ₹{due.toFixed(2)}</span>;
+                  }
+                  return null;
+                })()}
+              </div>
+              {/* Actions */}
+              <div className="flex gap-2 pt-1 border-t border-gray-100">
+                {(() => {
+                  const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                  const isUnpaid = totalPaidAmount < parseFloat(order.total_amount || 0);
+                  return isUnpaid && order.status !== 'CANCELLED';
+                })() && (
+                  <button
+                    onClick={() => handleDirectSettle(order.id)}
+                    disabled={isSettlingId === order.id}
+                    className="flex-1 text-white bg-amber-600 hover:bg-amber-700 px-3 py-2 rounded-lg transition-colors inline-flex items-center justify-center text-xs font-semibold gap-1 disabled:opacity-70"
+                  >
+                    {isSettlingId === order.id ? (
+                      <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : '✓'}
+                    Settle
+                  </button>
+                )}
+                <button
+                  onClick={() => setSelectedOrderId(order.id)}
+                  className="flex-1 bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors inline-flex items-center justify-center text-xs font-semibold gap-1"
+                >
+                  <Eye className="w-3.5 h-3.5" /> View Details
+                </button>
+              </div>
+            </div>
+          ))
         )}
+
+        {!isLoading && orders.length > 0 && <Pagination compact />}
       </div>
 
       {selectedOrderId && (

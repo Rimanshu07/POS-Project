@@ -206,8 +206,8 @@ export const AuditLogs = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* ── DESKTOP TABLE (md and above) ── */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -299,7 +299,7 @@ export const AuditLogs = () => {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Desktop Pagination */}
         {totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
             <p className="text-sm text-gray-600">
@@ -319,6 +319,93 @@ export const AuditLogs = () => {
                 className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 Next <ChevronRight className="w-4 h-4 ml-1" />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── MOBILE CARDS (below md) ── */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="bg-white rounded-xl p-6 text-center text-gray-500 border border-gray-100 shadow-sm flex flex-col items-center gap-2">
+            <div className="w-5 h-5 border-2 border-[#163b2d] border-t-transparent rounded-full animate-spin"></div>
+            <span>Loading audit logs...</span>
+          </div>
+        ) : isError ? (
+          <div className="bg-white rounded-xl p-6 text-center text-red-500 border border-gray-100 shadow-sm">
+            <AlertCircle className="w-8 h-8 mx-auto mb-2 text-red-400" />
+            <p className="font-semibold">Failed to load audit logs</p>
+            <p className="text-xs text-gray-500 mt-1">{error?.message || 'Access restricted to administrators'}</p>
+          </div>
+        ) : logs.length === 0 ? (
+          <div className="bg-white rounded-xl p-6 text-center border border-gray-100 shadow-sm">
+            <ShieldCheck className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p className="font-medium text-gray-700">No audit logs found</p>
+            <p className="text-xs text-gray-400 mt-1">Actions performed by staff members will automatically show up here.</p>
+          </div>
+        ) : (
+          logs.map((log) => (
+            <div key={log.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 border-b border-gray-50 pb-2">
+                <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                  <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span className="font-medium">{formatDate(log.created_at)}</span>
+                </div>
+                <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded bg-gray-100 text-gray-700">
+                  {log.entity} #{log.entity_id}
+                </span>
+              </div>
+              
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-full bg-[#163b2d] text-[#f2c879] flex flex-shrink-0 items-center justify-center font-bold text-xs shadow-sm">
+                  {log.user?.name ? log.user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{log.user?.name || `User #${log.user_id}`}</p>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[11px] text-gray-500 truncate">{log.user?.username || log.user?.email || '—'}</span>
+                    {log.user?.role && (
+                      <span className="inline-flex px-1.5 py-0.5 rounded text-[9px] font-bold bg-gray-100 text-gray-600">
+                        {log.user.role}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                {getActionBadge(log.action)}
+              </div>
+
+              <div className="pt-2 border-t border-gray-50">
+                <div className="text-xs text-gray-500 mb-1 font-medium">Metadata:</div>
+                {renderMetadata(log.metadata)}
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Mobile Pagination */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-gray-500">
+              Page {page} of {totalPages}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                disabled={page === totalPages}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
+              >
+                Next
               </button>
             </div>
           </div>

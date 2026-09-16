@@ -152,50 +152,60 @@ export const Categories = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 flex items-center">
-            <Tags className="mr-2 h-6 w-6 text-indigo-600" />
-            Categories
-          </h1>
-          <p className="text-gray-500 mt-1">Manage product categories</p>
+      <div className="flex flex-col gap-4">
+        {/* Title + Action Buttons */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+              <Tags className="mr-2 h-6 w-6 text-indigo-600 flex-shrink-0" />
+              Categories
+            </h1>
+            <p className="text-gray-500 mt-1">Manage product categories</p>
+          </div>
+          {canManage && (
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setIsBulkModalOpen(true)}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium text-sm"
+              >
+                <Upload className="w-4 h-4 mr-1.5" /> Bulk Upload
+              </button>
+              <button
+                onClick={() => handleOpenModal()}
+                className="flex-1 sm:flex-none inline-flex items-center justify-center px-3 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium text-sm"
+              >
+                <Plus className="w-4 h-4 mr-1.5" /> Add Category
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="grid w-full grid-cols-1 gap-3 sm:w-auto sm:grid-cols-2">
-          <div className="flex items-center gap-4 rounded-xl border border-indigo-100 bg-indigo-50 p-5 shadow-sm">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-600 text-white">
-              <Tags className="h-6 w-6" />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-indigo-50 p-4 shadow-sm">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-600 text-white">
+              <Tags className="h-5 w-5" />
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-indigo-700">Total Categories</p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">{totalCategoryCount}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-indigo-700 truncate">Categories</p>
+              <p className="mt-0.5 text-xl font-extrabold text-gray-900">{totalCategoryCount}</p>
             </div>
           </div>
-          <div className="flex items-center gap-4 rounded-xl border border-emerald-100 bg-emerald-50 p-5 shadow-sm">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-600 text-white">
-              <Package className="h-6 w-6" />
+          <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 p-4 shadow-sm">
+            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Package className="h-5 w-5" />
             </div>
-            <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700">Total Products</p>
-              <p className="mt-1 text-2xl font-extrabold text-gray-900">{totalProductCount}</p>
+            <div className="min-w-0">
+              <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 truncate">Products</p>
+              <p className="mt-0.5 text-xl font-extrabold text-gray-900">{totalProductCount}</p>
             </div>
           </div>
         </div>
-        {canManage && (
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setIsBulkModalOpen(true)} className="inline-flex items-center px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors shadow-sm font-medium">
-              <Upload className="w-5 h-5 mr-2" /> Bulk Upload
-            </button>
-            <button onClick={() => handleOpenModal()} className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors shadow-sm font-medium">
-              <Plus className="w-5 h-5 mr-2" /> Add Category
-            </button>
-          </div>
-        )}
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4">
-        <div className="flex-1 relative">
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
           <input
             type="text"
@@ -205,22 +215,19 @@ export const Categories = () => {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
           />
         </div>
-        
-        <div className="flex gap-4">
-          <select
-            value={statusFilter}
-            onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
-          >
-            <option value="ALL">All Status</option>
-            <option value="ACTIVE">Active</option>
-            <option value="INACTIVE">Inactive</option>
-          </select>
-        </div>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white"
+        >
+          <option value="ALL">All Status</option>
+          <option value="ACTIVE">Active</option>
+          <option value="INACTIVE">Inactive</option>
+        </select>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden">
+      {/* ── DESKTOP TABLE (md and above) ── */}
+      <div className="hidden md:block bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-100">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -250,9 +257,7 @@ export const Categories = () => {
                   <td colSpan={canManage ? 3 : 2} className="px-6 py-12 text-center">
                     <Tags className="mx-auto h-12 w-12 text-gray-300" />
                     <h3 className="mt-2 text-sm font-medium text-gray-900">No categories found</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      Adjust your filters or add a new category.
-                    </p>
+                    <p className="mt-1 text-sm text-gray-500">Adjust your filters or add a new category.</p>
                   </td>
                 </tr>
               ) : (
@@ -290,7 +295,7 @@ export const Categories = () => {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Desktop Pagination */}
         {meta.totalPages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
             <p className="text-sm text-gray-700">
@@ -310,6 +315,80 @@ export const Categories = () => {
                 onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
                 disabled={page === meta.totalPages}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-gray-100 bg-white"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── MOBILE CARDS (below md) ── */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="bg-white rounded-xl p-6 text-center text-gray-500 border border-gray-100 shadow-sm">
+            Loading categories...
+          </div>
+        ) : isError ? (
+          <div className="bg-white rounded-xl p-6 text-center text-red-500 border border-gray-100 shadow-sm">
+            Failed to load categories
+          </div>
+        ) : categories.length === 0 ? (
+          <div className="bg-white rounded-xl p-6 text-center border border-gray-100 shadow-sm">
+            <Tags className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p className="text-sm font-medium text-gray-900">No categories found</p>
+            <p className="text-xs text-gray-500 mt-1">Adjust your filters or add a new category.</p>
+          </div>
+        ) : (
+          categories.map((category) => (
+            <div key={category.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-gray-900 truncate">{category.name}</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {category.is_active ? (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                      <Check className="w-3 h-3 mr-1" /> Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                      <XIcon className="w-3 h-3 mr-1" /> Inactive
+                    </span>
+                  )}
+                  {canManage && (
+                    <button
+                      onClick={() => handleOpenModal(category)}
+                      className="text-indigo-600 hover:text-indigo-900 p-1.5 hover:bg-indigo-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+
+        {/* Mobile Pagination */}
+        {meta.totalPages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-gray-500">
+              Page {page} of {meta.totalPages} · {meta.total} categories
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(meta.totalPages, p + 1))}
+                disabled={page === meta.totalPages}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
               >
                 Next
               </button>

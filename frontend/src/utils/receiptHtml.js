@@ -7,7 +7,9 @@ export const buildReceiptHtml = (
   payMethod,
   tenderedAmt,
   discountAmt = 0,
-  orderDate = null
+  orderDate = null,
+  totalPaidAmt = null, // Newly added
+  allPayments = [] // Newly added to show detailed payments
 ) => {
   const now = orderDate ? new Date(orderDate) : new Date();
   const dd = String(now.getDate()).padStart(2, '0');
@@ -21,28 +23,40 @@ export const buildReceiptHtml = (
   const roundOff = (totalAmt - exactTotal).toFixed(2);
   const totalQty = orderItemsList.reduce((s, i) => s + i.quantity, 0);
   
-  const change = payMethod === 'CASH' && parseFloat(tenderedAmt || 0) > totalAmt
+  // If totalPaidAmt is not explicitly passed, we fallback to old logic: it's fully paid if there's a payMethod, otherwise 0
+  const actualPaid = totalPaidAmt !== null ? parseFloat(totalPaidAmt) : (payMethod ? totalAmt : 0);
+  const dueAmount = Math.max(0, totalAmt - actualPaid);
+  
+  const change = parseFloat(tenderedAmt || 0) > totalAmt
     ? (parseFloat(tenderedAmt) - totalAmt).toFixed(2)
     : null;
 
-  // Aggregate GST logic
-  const gstMap = {};
+  // Aggregate Tax logic
+  const taxMap = { GST: {}, VAT: {} };
   orderItemsList.forEach(item => {
     const rate = parseFloat(item.gst_percentage || 0);
+    const type = item.gst_type?.toUpperCase() === 'VAT' ? 'VAT' : 'GST';
     if (rate > 0) {
-      if (!gstMap[rate]) gstMap[rate] = 0;
-      gstMap[rate] += parseFloat(item.gst_amount || 0);
+      if (!taxMap[type][rate]) taxMap[type][rate] = 0;
+      taxMap[type][rate] += parseFloat(item.gst_amount || 0);
     }
   });
 
-  const gstLines = Object.keys(gstMap).map(rate => {
+  let taxLinesHtml = '';
+  Object.keys(taxMap.GST).forEach(rate => {
     const halfRate = (parseFloat(rate) / 2).toFixed(1);
-    const halfAmt = (gstMap[rate] / 2).toFixed(2);
-    return `
+    const halfAmt = (taxMap.GST[rate] / 2).toFixed(2);
+    taxLinesHtml += `
       <div class="row gst-line"><span>SGST ${halfRate}%</span><span>${halfAmt}</span></div>
       <div class="row gst-line"><span>CGST ${halfRate}%</span><span>${halfAmt}</span></div>
     `;
-  }).join('');
+  });
+  Object.keys(taxMap.VAT).forEach(rate => {
+    const amt = taxMap.VAT[rate].toFixed(2);
+    taxLinesHtml += `
+      <div class="row gst-line"><span>VAT ${rate}%</span><span>${amt}</span></div>
+    `;
+  });
 
   return `<!DOCTYPE html><html><head>
     <title>Receipt - ${billLabel}</title>
@@ -84,13 +98,17 @@ export const buildReceiptHtml = (
     </div>`).join('')}
     <div class="divider-dash"></div>
     <div class="row"><span>Total Qty: ${totalQty}</span><span>Sub Total &nbsp;&nbsp;&nbsp;${subtotalAmt.toFixed(2)}</span></div>
-    ${discountAmt > 0 ? `<div class="row"><span>Item wise Discount</span><span>(${parseFloat(discountAmt).toFixed(2)})</span></div>` : ''}
-    ${gstLines}
+    ${discountAmt > 0 ? `<div class="row"><span>Discount</span><span>-&#8377;${parseFloat(discountAmt).toFixed(2)}</span></div>` : ''}
+    ${taxLinesHtml}
     <div class="divider-solid"></div>
     <div class="row"><span>Round off</span><span>${parseFloat(roundOff) > 0 ? '+'+roundOff : roundOff}</span></div>
     <div class="row grand"><span>Grand Total</span><span>&#8377;${totalAmt.toFixed(2)}</span></div>
     <div class="divider-solid"></div>
-    <div style="font-size:11px;">${payMethod ? `Paid via ${payMethod}` : 'DUE / PENDING'}</div>
+    ${allPayments && allPayments.length > 0 
+      ? allPayments.map(p => `<div class="row"><span>Paid (${p.method})</span><span>&#8377;${parseFloat(p.amount).toFixed(2)}</span></div>`).join('')
+      : (actualPaid > 0 ? `<div class="row"><span>Paid (${payMethod})</span><span>&#8377;${actualPaid.toFixed(2)}</span></div>` : '')
+    }
+    ${dueAmount > 0 ? `<div class="row" style="font-weight:bold; font-size:12px;"><span>DUE / PENDING:</span><span>&#8377;${dueAmount.toFixed(2)}</span></div>` : ''}
     ${change ? `<div class="row"><span>Change:</span><span>&#8377;${change}</span></div>` : ''}
     <div class="divider-dash"></div>
     <div class="footer">

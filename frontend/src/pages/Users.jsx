@@ -176,8 +176,8 @@ export const Users = () => {
         </div>
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      {/* ── DESKTOP TABLE (md and above) ── */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -274,7 +274,7 @@ export const Users = () => {
           </table>
         </div>
 
-        {/* Pagination */}
+        {/* Desktop Pagination */}
         {meta.pages > 1 && (
           <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between bg-gray-50">
             <p className="text-sm text-gray-700">
@@ -294,6 +294,101 @@ export const Users = () => {
                 onClick={() => setPage(p => Math.min(meta.pages, p + 1))}
                 disabled={page === meta.pages}
                 className="px-3 py-1 border border-gray-300 rounded-md text-sm disabled:opacity-50 hover:bg-gray-100 bg-white"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── MOBILE CARDS (below md) ── */}
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="bg-white rounded-xl p-6 text-center text-gray-500 border border-gray-100 shadow-sm">
+            Loading users...
+          </div>
+        ) : isError ? (
+          <div className="bg-white rounded-xl p-6 text-center text-red-500 border border-gray-100 shadow-sm">
+            Failed to load users: {error.message}
+          </div>
+        ) : users.length === 0 ? (
+          <div className="bg-white rounded-xl p-6 text-center border border-gray-100 shadow-sm">
+            <UsersIcon className="mx-auto h-10 w-10 text-gray-300 mb-2" />
+            <p className="text-sm font-medium text-gray-900">No users found</p>
+            <p className="text-xs text-gray-500 mt-1">Adjust your filters or add a new user.</p>
+          </div>
+        ) : (
+          users.map((u) => (
+            <div key={u.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 space-y-3">
+              <div className="flex items-start gap-3">
+                <div className="h-10 w-10 flex-shrink-0 bg-indigo-100 text-indigo-700 rounded-full flex items-center justify-center font-bold">
+                  {u.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
+                      {u.name} {u.id === currentUser?.id && '(You)'}
+                    </p>
+                    {u.is_active ? (
+                      <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        Active
+                      </span>
+                    ) : (
+                      <span className="flex-shrink-0 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                        Inactive
+                      </span>
+                    )}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
+                    <span>@{u.username}</span>
+                    <span className="truncate max-w-[200px]">{u.email}</span>
+                  </div>
+                  <div className="mt-1.5">
+                    {getRoleBadge(u.role)}
+                  </div>
+                </div>
+              </div>
+              
+              {isAdmin && (
+                <div className="pt-3 border-t border-gray-100 flex gap-2">
+                  <button
+                    onClick={() => handleOpenModal(u)}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 hover:bg-indigo-100 px-3 py-2 rounded-lg transition-colors"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" /> Edit
+                  </button>
+                  <button
+                    onClick={() => handleOpenDeleteModal(u)}
+                    disabled={u.id === currentUser?.id}
+                    className="flex-1 inline-flex items-center justify-center gap-1.5 text-xs font-medium text-red-600 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" /> Delete
+                  </button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+
+        {/* Mobile Pagination */}
+        {meta.pages > 1 && (
+          <div className="flex items-center justify-between pt-2">
+            <p className="text-xs text-gray-500">
+              Page {page} of {meta.pages}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+                disabled={page === 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setPage(p => Math.min(meta.pages, p + 1))}
+                disabled={page === meta.pages}
+                className="px-3 py-1.5 border border-gray-300 rounded-lg text-xs disabled:opacity-50 hover:bg-gray-100 bg-white font-medium"
               >
                 Next
               </button>

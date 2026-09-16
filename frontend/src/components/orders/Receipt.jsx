@@ -18,10 +18,19 @@ export const Receipt = ({ order }) => {
   };
 
   const subtotal = parseFloat(order.subtotal || 0);
-  const taxAmount = parseFloat(order.tax_amount || 0);
   const discountAmount = parseFloat(order.discount_amount || 0);
   const totalAmount = parseFloat(order.total_amount || 0);
   const totalQty = order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0;
+
+  // Separate GST and VAT totals
+  const { gstTotal, vatTotal } = (order.items || []).reduce((acc, item) => {
+    const amt = parseFloat(item.gst_amount || 0);
+    if ((item.gst_type || '').toUpperCase() === 'VAT') acc.vatTotal += amt;
+    else acc.gstTotal += amt;
+    return acc;
+  }, { gstTotal: 0, vatTotal: 0 });
+
+  const taxAmount = gstTotal + vatTotal;
   const exactTotal = subtotal - discountAmount + taxAmount;
   const roundOff = (totalAmount - exactTotal).toFixed(2);
 
@@ -109,8 +118,14 @@ export const Receipt = ({ order }) => {
             <span style={{ textAlign: "right" }}>{parseFloat(item.line_total || 0).toFixed(2)}</span>
           </div>
           <div style={{ fontSize: "10px", paddingLeft: "4px", color: "#333" }}>
-            CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
-            SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+            {(item.gst_type || '').toUpperCase() === 'VAT' ? (
+              <>VAT {parseFloat(item.gst_percentage || 0).toFixed(1)}%: ₹{parseFloat(item.gst_amount || 0).toFixed(2)}</>
+            ) : (
+              <>
+                CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
+                SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+              </>
+            )}
           </div>
         </React.Fragment>
       ))}
@@ -133,17 +148,23 @@ export const Receipt = ({ order }) => {
           </div>
         )}
 
-        {taxAmount > 0 && (
+        {gstTotal > 0 && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
               <span>CGST</span>
-              <span>{(taxAmount / 2).toFixed(2)}</span>
+              <span>{(gstTotal / 2).toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
               <span>SGST</span>
-              <span>{(taxAmount / 2).toFixed(2)}</span>
+              <span>{(gstTotal / 2).toFixed(2)}</span>
             </div>
           </>
+        )}
+        {vatTotal > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
+            <span>VAT</span>
+            <span>{vatTotal.toFixed(2)}</span>
+          </div>
         )}
       </div>
 
@@ -165,8 +186,8 @@ export const Receipt = ({ order }) => {
 
       {payments.length > 0 && (
         <div style={{ fontSize: "11px", marginBottom: "4px" }}>
-          {payments.map((payment) => (
-            <div key={payment.id || payment.method}>
+          {payments.map((payment, idx) => (
+            <div key={payment.id || idx}>
               Paid via {payment.method}: ₹{parseFloat(payment.amount || 0).toFixed(2)}
             </div>
           ))}

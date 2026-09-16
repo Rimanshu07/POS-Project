@@ -5,7 +5,7 @@ import { useCreateOrder } from '../../hooks/usePOS';
 import { buildReceiptHtml } from '../../utils/receiptHtml';
 
 export const CheckoutModal = ({ isOpen, onClose, total }) => {
-  const { items, clearCart, discount, setDiscount, pendingOrderNumber } = useCartStore();
+  const { items, clearCart, discount, setDiscount, pendingOrderNumber, alreadyPaid, existingPayments } = useCartStore();
   const [paymentAmounts, setPaymentAmounts] = useState({ CASH: '', UPI: '', CARD: '', NEFT: '', RTGS: '', OTHERS: '' });
   const [billNo, setBillNo] = useState(pendingOrderNumber || '');
   const [errorMsg, setErrorMsg] = useState(null);
@@ -40,36 +40,62 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
     ? parseFloat(discount.value || 0) 
     : subtotal * (parseFloat(discount.value || 0) / 100);
   
-  const taxAmount = items.reduce((sum, item) => {
-    const lineTotal = parseFloat(item.price) * item.quantity;
-    const proportion = subtotal > 0 ? lineTotal / subtotal : 0;
-    const itemDiscount = discountAmount * proportion;
-    const discountedLine = lineTotal - itemDiscount;
-    return sum + (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
-  }, 0);
+  const effectiveDiscount = Math.min(subtotal, Math.max(0, discountAmount));
+  const discountedSubtotal = subtotal - effectiveDiscount;
 
-  const exactTotal = Math.max(0, subtotal - discountAmount) + taxAmount;
+  const { gstAmount, vatAmount } = items.reduce((acc, item) => {
+    const lineTotal = parseFloat(item.price) * item.quantity;
+    const itemDiscount = subtotal > 0 ? (lineTotal / subtotal) * effectiveDiscount : 0;
+    const discountedLine = Math.max(0, lineTotal - itemDiscount);
+    const tax = (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
+    
+    if (item.gst_type?.toUpperCase() === 'VAT') {
+      acc.vatAmount += tax;
+    } else {
+      acc.gstAmount += tax;
+    }
+    return acc;
+  }, { gstAmount: 0, vatAmount: 0 });
+
+  const taxAmount = gstAmount + vatAmount;
+
+  const exactTotal = discountedSubtotal + taxAmount;
   const roundedTotal = Math.round(exactTotal);
   const roundOff = roundedTotal - exactTotal;
+
+  const remainingDue = Math.max(0, exactTotal - (alreadyPaid || 0));
 
   const displayBillNo = billNo || 'NEW_ORDER';
   
   const previewHtml = React.useMemo(() => {
-    const orderItems = items.map(i => ({
-      product: { name: i.name },
-      quantity: i.quantity,
-      unit_price: i.price,
-      line_total: parseFloat(i.price) * i.quantity,
-      gst_type: i.gst_type,
-      gst_percentage: i.gst_percentage,
-      gst_amount: parseFloat(i.price) * i.quantity * parseFloat(i.gst_percentage || 0) / 100
-    }));
+    const orderItems = items.map(i => {
+      const lineTotal = parseFloat(i.price) * i.quantity;
+      const itemDiscount = subtotal > 0 ? (lineTotal / subtotal) * effectiveDiscount : 0;
+      const discountedLine = Math.max(0, lineTotal - itemDiscount);
+      return {
+        product: { name: i.name },
+        quantity: i.quantity,
+        unit_price: i.price,
+        line_total: lineTotal,
+        gst_type: i.gst_type,
+        gst_percentage: i.gst_percentage,
+        gst_amount: discountedLine * parseFloat(i.gst_percentage || 0) / 100
+      };
+    });
     const paymentLabel = Object.entries(paymentAmounts)
       .filter(([, amount]) => parseFloat(amount || 0) > 0)
       .map(([paymentMethod]) => paymentMethod)
       .join(' + ') || '';
-    return buildReceiptHtml(displayBillNo, orderItems, subtotal, taxAmount, parseFloat(total), paymentLabel, paymentAmounts.CASH, discountAmount);
-  }, [items, subtotal, taxAmount, total, paymentAmounts, displayBillNo, discountAmount]);
+    const currentPaid = Object.values(paymentAmounts).reduce((sum, amount) => sum + parseFloat(amount || 0), 0);
+    const totalPaidAmt = (alreadyPaid || 0) + currentPaid;
+    
+    const currentPaymentsList = Object.entries(paymentAmounts)
+      .filter(([, amount]) => parseFloat(amount || 0) > 0)
+      .map(([method, amount]) => ({ method, amount: parseFloat(amount) }));
+    const allPayments = [...(existingPayments || []), ...currentPaymentsList];
+      
+    return buildReceiptHtml(displayBillNo, orderItems, subtotal, taxAmount, parseFloat(total), paymentLabel, paymentAmounts.CASH, discountAmount, null, totalPaidAmt, allPayments);
+  }, [items, subtotal, effectiveDiscount, taxAmount, total, paymentAmounts, displayBillNo, discountAmount, alreadyPaid, existingPayments]);
 
   const handleCheckout = async (isPayLater = false) => {
     setErrorMsg(null);
@@ -89,8 +115,8 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         setErrorMsg('Please add at least one payment or use Pay Later.');
         return;
       }
-      // Allow payment if it covers at least the rounded down exact total
-      const minAllowed = Math.floor(exactTotal);
+      // Allow payment if it covers at least the rounded down remaining due
+      const minAllowed = Math.floor(remainingDue);
       if (totalPaid < minAllowed) {
         setErrorField('payment');
         setErrorMsg(`Payment is short by ₹${(minAllowed - totalPaid).toFixed(2)}. Minimum accepted payment is ₹${minAllowed.toFixed(2)}.`);
@@ -105,11 +131,14 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         quantity: item.quantity
       })),
       discount_amount: discountAmount,
-      payment: isPayLater ? [] : Object.entries(paymentAmounts)
+      discount_type: discount.type,
+      discount_rate: parseFloat(discount.value || 0),
+      payment: Object.entries(paymentAmounts)
         .filter(([, amount]) => parseFloat(amount || 0) > 0)
         .map(([paymentMethod, amount]) => ({
           method: paymentMethod,
-          amount: parseFloat(amount).toFixed(2)
+          amount: parseFloat(amount).toFixed(2),
+          ...(paymentMethod === 'CASH' ? { amount_tendered: parseFloat(paymentAmounts.CASH || amount).toFixed(2) } : {})
         }))
     };
 
@@ -134,7 +163,16 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         .map(([paymentMethod]) => paymentMethod)
         .join(' + ');
       const finalTotal = order.total_amount ? parseFloat(order.total_amount) : parseFloat(total);
-      const receiptHtml = buildReceiptHtml(finalBillNo, orderItems, finalSubtotal, finalTax, finalTotal, paymentLabel, paymentAmounts.CASH, discountAmount);
+      
+      const currentPaid = isPayLater ? 0 : Object.values(paymentAmounts).reduce((sum, amount) => sum + parseFloat(amount || 0), 0);
+      const totalPaidAmt = (alreadyPaid || 0) + currentPaid;
+      
+      const currentPaymentsList = isPayLater ? [] : Object.entries(paymentAmounts)
+        .filter(([, amount]) => parseFloat(amount || 0) > 0)
+        .map(([method, amount]) => ({ method, amount: parseFloat(amount) }));
+      const allPayments = [...(existingPayments || []), ...currentPaymentsList];
+      
+      const receiptHtml = buildReceiptHtml(finalBillNo, orderItems, finalSubtotal, finalTax, finalTotal, paymentLabel, paymentAmounts.CASH, discountAmount, null, totalPaidAmt, allPayments);
 
       const pw = window.open('', '_blank', 'width=420,height=640');
       if (pw) {
@@ -172,7 +210,7 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
 
   const paymentMethods = ['CASH', 'UPI', 'CARD', 'NEFT', 'RTGS', 'OTHERS'];
   const totalPaid = Object.values(paymentAmounts).reduce((sum, amount) => sum + parseFloat(amount || 0), 0);
-  const remainingAmount = Math.max(0, parseFloat(total) - totalPaid);
+  const remainingAmount = Math.max(0, remainingDue - totalPaid);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900 bg-opacity-50 p-2 sm:p-4">
@@ -270,6 +308,8 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                         <input 
                           type="number" 
                           min="0"
+                          max={discount.type === 'PERCENT' ? '100' : undefined}
+                          step="any"
                           value={discount.value}
                           onChange={e => setDiscount(e.target.value, discount.type)}
                           className="w-16 px-1 text-right bg-transparent border-b border-gray-300 focus:outline-none focus:border-indigo-500 focus:text-indigo-600 tabular-nums text-sm font-medium"
@@ -285,8 +325,15 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                       </div>
                     )}
 
-                    <div className="flex justify-between text-gray-500 text-xs mt-1"><span>CGST</span><span>₹{(taxAmount / 2).toFixed(2)}</span></div>
-                    <div className="flex justify-between text-gray-500 text-xs"><span>SGST</span><span>₹{(taxAmount / 2).toFixed(2)}</span></div>
+                    {gstAmount > 0 && (
+                      <>
+                        <div className="flex justify-between text-gray-500 text-xs mt-1"><span>CGST</span><span>₹{(gstAmount / 2).toFixed(2)}</span></div>
+                        <div className="flex justify-between text-gray-500 text-xs"><span>SGST</span><span>₹{(gstAmount / 2).toFixed(2)}</span></div>
+                      </>
+                    )}
+                    {vatAmount > 0 && (
+                      <div className="flex justify-between text-gray-500 text-xs mt-1"><span>VAT</span><span>₹{vatAmount.toFixed(2)}</span></div>
+                    )}
                     
                     <div className="flex justify-between text-gray-400 text-xs mt-1">
                       <span>Round Off</span>
@@ -294,8 +341,28 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                     </div>
 
                     <div className="flex justify-between font-bold text-gray-900 text-base pt-1 border-t border-gray-200">
-                      <span>Final Total</span><span>₹{parseFloat(total).toFixed(2)}</span>
+                      <span>{alreadyPaid > 0 ? 'Order Total' : 'Final Total'}</span><span>₹{parseFloat(total).toFixed(2)}</span>
                     </div>
+                    {alreadyPaid > 0 && (
+                      <>
+                        <div className="flex justify-between font-semibold text-gray-800 text-sm mt-1 border-t border-gray-200 pt-1">
+                          <span>Already Paid</span><span>-₹{parseFloat(alreadyPaid).toFixed(2)}</span>
+                        </div>
+                        {existingPayments && existingPayments.length > 0 && (
+                          <div className="space-y-0.5 ml-2 mt-0.5">
+                            {existingPayments.map((p, idx) => (
+                              <div key={idx} className="flex justify-between text-green-700 text-xs">
+                                <span>{p.method} {p.created_at ? `(${new Date(p.created_at).toLocaleDateString()})` : ''}</span>
+                                <span>₹{parseFloat(p.amount).toFixed(2)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex justify-between font-bold text-red-600 text-base mt-1">
+                          <span>Remaining Due</span><span>₹{parseFloat(remainingDue).toFixed(2)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -329,10 +396,10 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
                     );
                   })}
                 </div>
-                {totalPaid > parseFloat(total) && (
+                {totalPaid > remainingDue && (
                   <div className="mt-3 flex justify-between text-sm font-semibold text-green-700 bg-green-50 rounded-lg px-3 py-2">
                     <span>Change</span>
-                    <span>₹{(totalPaid - parseFloat(total)).toFixed(2)}</span>
+                    <span>₹{(totalPaid - remainingDue).toFixed(2)}</span>
                   </div>
                 )}
                 <div className="mt-3 flex justify-between text-sm font-semibold bg-white border rounded-lg px-3 py-2">
@@ -366,25 +433,27 @@ export const CheckoutModal = ({ isOpen, onClose, total }) => {
         </div>
 
         {/* Footer */}
-        <div className="px-5 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3 flex-none">
+        <div className="px-4 py-3 sm:px-5 sm:py-4 border-t border-gray-200 bg-gray-50 flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 flex-none">
           <button
             onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Cancel
           </button>
-          <button
-            onClick={() => handleCheckout(true)}
-            disabled={createOrderMutation.isPending}
-            className="px-4 py-2 text-sm font-bold text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200 rounded-lg disabled:opacity-70 transition-colors flex items-center gap-2"
-          >
-            <Clock className="w-4 h-4" />
-            Punch (Pay Later)
-          </button>
+          {!pendingOrderNumber && (
+            <button
+              onClick={() => handleCheckout(true)}
+              disabled={createOrderMutation.isPending}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-bold text-amber-700 bg-amber-100 border border-amber-300 hover:bg-amber-200 rounded-lg disabled:opacity-70 transition-colors flex justify-center items-center gap-2"
+            >
+              <Clock className="w-4 h-4" />
+              Punch (Pay Later)
+            </button>
+          )}
           <button
             onClick={() => handleCheckout(false)}
             disabled={createOrderMutation.isPending}
-            className="px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-70 transition-colors"
+            className="w-full sm:w-auto px-6 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-70 transition-colors flex justify-center items-center"
           >
             {createOrderMutation.isPending ? 'Processing...' : `Complete Sale — ₹${parseFloat(total).toFixed(2)}`}
           </button>

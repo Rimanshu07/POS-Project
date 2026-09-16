@@ -1,9 +1,21 @@
+import React, { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { LogOut, User, Utensils } from 'lucide-react';
-import { Menu } from 'lucide-react';
+import { LogOut, User, Utensils, Menu, ChevronDown } from 'lucide-react';
 
 export const Navbar = ({ onMenuClick }) => {
   const { user, logout, isLoggingOut } = useAuth();
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   return (
     <div className="flex h-16 min-w-0 shrink-0 items-center border-b border-[#e8e1d5] bg-[#fffdf9] px-2 sm:px-6 lg:px-8 shadow-sm relative z-10">
@@ -19,22 +31,39 @@ export const Navbar = ({ onMenuClick }) => {
           <Utensils className="h-4 w-4 flex-none" />
           <span className="truncate text-sm font-bold restaurant-heading">Sherwoods POS</span>
         </div>
-        <div className="flex flex-none items-center space-x-1.5 text-sm text-[#26332d] sm:space-x-2">
-          <User className="h-5 w-5 text-[#0e6b4f]" />
-          <span className="hidden sm:inline max-w-[120px] truncate font-semibold">{user?.name}</span>
-          <span className="hidden md:inline-flex items-center rounded-full bg-[#e6f2eb] px-2.5 py-1 text-xs font-bold text-[#0e6b4f] ring-1 ring-inset ring-[#b9d8c5] shadow-sm">
-            {user?.role}
-          </span>
+        {/* User pill with Dropdown */}
+        <div className="relative" ref={dropdownRef}>
+          <button
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="flex flex-none items-center space-x-1.5 text-sm text-[#26332d] sm:space-x-2 p-1 rounded hover:bg-gray-50 focus:outline-none transition-colors"
+          >
+            <User className="h-5 w-5 text-[#0e6b4f]" />
+            <span className="hidden sm:inline max-w-[120px] truncate font-semibold">{user?.name}</span>
+            <span className="hidden md:inline-flex items-center rounded-full bg-[#e6f2eb] px-2.5 py-1 text-xs font-bold text-[#0e6b4f] ring-1 ring-inset ring-[#b9d8c5] shadow-sm">
+              {user?.role}
+            </span>
+            <ChevronDown className={`h-4 w-4 text-gray-500 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* Dropdown Menu */}
+          {isDropdownOpen && (
+            <div className="absolute right-0 mt-2 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 overflow-hidden">
+              <div className="py-1">
+                <button
+                  onClick={() => {
+                    setIsDropdownOpen(false);
+                    logout();
+                  }}
+                  disabled={isLoggingOut}
+                  className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50"
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span className="font-medium">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        
-        <button
-          onClick={() => logout()}
-          disabled={isLoggingOut}
-          className="flex flex-none items-center gap-2 rounded-lg bg-white px-2.5 py-2 text-sm font-semibold text-red-600 shadow-sm ring-1 ring-inset ring-gray-200 hover:bg-red-50 hover:ring-red-200 disabled:opacity-50 transition-modern sm:px-3.5"
-        >
-          <LogOut className="h-4 w-4" />
-          <span className="hidden sm:inline">{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
-        </button>
       </div>
     </div>
   );

@@ -19,9 +19,18 @@ export const Invoice = ({ invoice }) => {
 
   const totalQty = invoice.items.reduce((sum, item) => sum + item.quantity, 0);
   const subtotal = parseFloat(invoice.subtotal || 0);
-  const taxAmount = parseFloat(invoice.tax_amount || 0);
   const discountAmount = parseFloat(invoice.discount_amount || 0);
   const totalAmount = parseFloat(invoice.total_amount || 0);
+
+  // Separate GST and VAT totals from items
+  const { gstTotal, vatTotal } = invoice.items.reduce((acc, item) => {
+    const amt = parseFloat(item.gst_amount || 0);
+    if ((item.gst_type || '').toUpperCase() === 'VAT') acc.vatTotal += amt;
+    else acc.gstTotal += amt;
+    return acc;
+  }, { gstTotal: 0, vatTotal: 0 });
+
+  const taxAmount = gstTotal + vatTotal;
   // Round off
   const exactTotal = subtotal - discountAmount + taxAmount;
   const roundOff = (totalAmount - exactTotal).toFixed(2);
@@ -131,14 +140,16 @@ export const Invoice = ({ invoice }) => {
               <span style={{ textAlign: "right" }}>{price}</span>
               <span style={{ textAlign: "right" }}>{amount}</span>
             </div>
-            {itemDiscount > 0 && (
-              <div style={{ paddingLeft: "4px", fontSize: "10px", color: "#333" }}>
-                (D) Discount &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;({itemDiscount.toFixed(2)})
-              </div>
-            )}
+
             <div style={{ paddingLeft: "4px", fontSize: "10px", color: "#333" }}>
-              CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
-              SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+              {(item.gst_type || '').toUpperCase() === 'VAT' ? (
+                <>VAT {parseFloat(item.gst_percentage || 0).toFixed(1)}%: ₹{parseFloat(item.gst_amount || 0).toFixed(2)}</>
+              ) : (
+                <>
+                  CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
+                  SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+                </>
+              )}
             </div>
           </React.Fragment>
         );
@@ -166,17 +177,23 @@ export const Invoice = ({ invoice }) => {
           </div>
         )}
 
-        {taxAmount > 0 && (
+        {gstTotal > 0 && (
           <>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
               <span>CGST</span>
-              <span>{(taxAmount / 2).toFixed(2)}</span>
+              <span>{(gstTotal / 2).toFixed(2)}</span>
             </div>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
               <span>SGST</span>
-              <span>{(taxAmount / 2).toFixed(2)}</span>
+              <span>{(gstTotal / 2).toFixed(2)}</span>
             </div>
           </>
+        )}
+        {vatTotal > 0 && (
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "1px" }}>
+            <span>VAT</span>
+            <span>{vatTotal.toFixed(2)}</span>
+          </div>
         )}
       </div>
 
@@ -197,13 +214,23 @@ export const Invoice = ({ invoice }) => {
       <div style={{ borderTop: "1px solid #000", margin: "5px 0" }} />
 
       {/* Payment method */}
-      {payments.length > 0 && (
-        <div style={{ fontSize: "11px", marginBottom: "4px" }}>
-          {payments.map((payment) => (
-            <div key={payment.method}>Paid via {payment.method}: ₹{formatCurrency(payment.amount)}</div>
-          ))}
-        </div>
-      )}
+      {(() => {
+        const totalPaidAmount = payments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+        const dueAmount = totalAmount - totalPaidAmount;
+        
+        return (
+          <div style={{ fontSize: "11px", marginBottom: "4px" }}>
+            {payments.length > 0 && payments.map((payment, idx) => (
+              <div key={`${payment.method}-${idx}`}>Paid via {payment.method}: ₹{formatCurrency(payment.amount)}</div>
+            ))}
+            {dueAmount > 0 && (
+              <div style={{ fontWeight: "bold", fontSize: "12px", marginTop: "2px" }}>
+                DUE / PENDING: ₹{formatCurrency(dueAmount)}
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       <div style={{ borderTop: "1px dashed #000", margin: "5px 0" }} />
 

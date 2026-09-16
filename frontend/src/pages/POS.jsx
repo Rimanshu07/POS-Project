@@ -29,6 +29,18 @@ export const POS = () => {
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const productsContainerRef = useRef(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const productParams = {
     is_active: "true",
@@ -183,24 +195,37 @@ export const POS = () => {
               <div>{currentTime.toLocaleTimeString("en-US")}</div>
             </div>
 
-            {/* User pill */}
-            <div className="flex items-center gap-2 rounded-full bg-[#285743] px-3 py-1.5">
-              <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f2c879] font-bold text-[#163b2d]">
-                {user?.name?.charAt(0) || "A"}
-              </div>
-              <span>{user?.name || "Admin"}</span>
-              <ChevronDown className="h-4 w-4 text-gray-400" />
-            </div>
+            {/* User pill with Dropdown */}
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 rounded-full bg-[#285743] px-3 py-1.5 hover:bg-[#1f4333] transition-colors focus:outline-none"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-[#f2c879] font-bold text-[#163b2d]">
+                  {user?.name?.charAt(0) || "A"}
+                </div>
+                <span>{user?.name || "Admin"}</span>
+                <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`} />
+              </button>
 
-            {/* ✅ LOGOUT BUTTON (Desktop) */}
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2 rounded-full bg-red-500 px-3 py-1.5 text-xs font-semibold text-white transition-all duration-200 hover:bg-red-600 hover:shadow-lg hover:-translate-y-0.5"
-              title="Logout"
-            >
-              <LogOut className="h-4 w-4" />
-              <span className="hidden xl:inline">Logout</span>
-            </button>
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none z-50 overflow-hidden">
+                  <div className="py-1">
+                    <button
+                      onClick={() => {
+                        setIsDropdownOpen(false);
+                        handleLogout();
+                      }}
+                      className="flex w-full items-center gap-3 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span className="font-medium">Logout</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

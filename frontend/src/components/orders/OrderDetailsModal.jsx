@@ -13,7 +13,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
   const printRef = useRef(null);
   const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const navigate = useNavigate();
-  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
+  const { setItems, setDiscount, setPendingOrderNumber, setAlreadyPaid, setExistingPayments } = useCartStore();
 
   if (!isOpen) return null;
 
@@ -22,12 +22,23 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
     (sum, item) => sum + parseFloat(item.gst_amount || 0),
     0
   ) || 0;
-  const itemTaxRate = parseFloat(order?.subtotal || 0) > 0
-    ? (itemTaxTotal / parseFloat(order.subtotal)) * 100
-    : 0;
+
+  // Separate GST and VAT totals
+  const { gstTotal, vatTotal } = (order?.items || []).reduce((acc, item) => {
+    const amt = parseFloat(item.gst_amount || 0);
+    if (item.gst_type?.toUpperCase() === 'VAT') acc.vatTotal += amt;
+    else acc.gstTotal += amt;
+    return acc;
+  }, { gstTotal: 0, vatTotal: 0 });
 
   const exactTotal = parseFloat(order?.subtotal || 0) - parseFloat(order?.discount_amount || 0) + itemTaxTotal;
   const roundOff = parseFloat(order?.total_amount || 0) - exactTotal;
+
+  // Show Settle button when order is not fully paid
+  const totalPaidAmount = (order?.payments || [])
+    .filter(p => p.status === 'PAID')
+    .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+  const isUnpaid = totalPaidAmount < parseFloat(order?.total_amount || 0);
 
   // Open a dedicated print popup with the receipt HTML so @media print CSS
   // conflicts with the main page don't cause a blank page.
@@ -47,7 +58,8 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
       paymentLabel,
       cashAmount,
       parseFloat(order.discount_amount || 0),
-      order.created_at
+      order.created_at,
+      totalPaidAmount
     );
       
     const printWindow = window.open('', '_blank', 'width=400,height=600');
@@ -70,9 +82,19 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
       gst_percentage: item.gst_percentage
     }));
     
+    const discountType = order.discount_type || 'FLAT';
+    const discountVal = discountType === 'PERCENT'
+      ? (order.discount_rate !== undefined && order.discount_rate !== null ? parseFloat(order.discount_rate) : '')
+      : (order.discount_amount !== undefined && order.discount_amount !== null ? parseFloat(order.discount_amount) : '');
+    
+    const validPayments = (order.payments || []).filter(p => p.status === 'PAID');
+    const alreadyPaid = validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+    
     setItems(cartItems);
-    setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+    setDiscount(discountVal, discountType);
     setPendingOrderNumber(order.order_number);
+    setAlreadyPaid(alreadyPaid);
+    setExistingPayments(validPayments);
     onClose();
     navigate('/pos', { state: { autoCheckout: true } });
   };
@@ -89,7 +111,7 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
           <div className="flex flex-wrap items-center justify-end gap-2">
             {order && (
               <>
-                {order.status === 'PENDING' && (
+                {isUnpaid && (
                   <button
                     onClick={handleSettle}
                     className="inline-flex items-center rounded-md border border-transparent bg-amber-600 px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-colors hover:bg-amber-700 focus:outline-none sm:text-sm animate-pulse shadow-amber-500/50"
@@ -163,33 +185,37 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                 </div>
 
                 {/* Items Table */}
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="border border-gray-200 rounded-xl overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Product</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 shadow-[1px_0_0_0_#e5e7eb]">Product</th>
                         <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qty</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Unit Price</th>
-                        <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Discount</th>
+
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">GST</th>
                         <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {order.items.map((item) => (
-                        <tr key={item.id}>
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                        <tr key={item.id} className="group hover:bg-gray-50 transition-colors">
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[1px_0_0_0_#e5e7eb]">
                             {item.product?.name || `Product ID #${item.product_id}`}
                           </td>
                           <td className="px-4 py-3 text-sm text-gray-500 text-center">{item.quantity}</td>
                           {/* HISTORICAL UNIT PRICE - AUTHORITATIVE */}
                           <td className="px-4 py-3 text-sm text-gray-500 text-right">₹{parseFloat(item.unit_price).toFixed(2)}</td>
-                          <td className="px-4 py-3 text-sm text-red-600 text-right">
-                            {parseFloat(item.discount_amount || 0) > 0 ? `-₹${parseFloat(item.discount_amount).toFixed(2)}` : '₹0.00'}
-                          </td>
+
                           <td className="px-4 py-3 text-xs text-gray-500 text-right">
-                            CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
-                            SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+                            {item.gst_type?.toUpperCase() === 'VAT' ? (
+                              <span>VAT {parseFloat(item.gst_percentage || 0).toFixed(1)}%: ₹{parseFloat(item.gst_amount || 0).toFixed(2)}</span>
+                            ) : (
+                              <>
+                                CGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}<br />
+                                SGST {(parseFloat(item.gst_percentage || 0) / 2).toFixed(1)}%: ₹{(parseFloat(item.gst_amount || 0) / 2).toFixed(2)}
+                              </>
+                            )}
                           </td>
                           <td className="px-4 py-3 text-sm font-medium text-gray-900 text-right">₹{parseFloat(item.line_total).toFixed(2)}</td>
                         </tr>
@@ -205,8 +231,8 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                     <h3 className="text-sm font-semibold text-gray-900 uppercase tracking-wider mb-4 border-b border-gray-200 pb-2">Payment Details</h3>
                     {order.payments && order.payments.length > 0 ? (
                       <div className="space-y-2 text-sm">
-                        {order.payments.map((payment) => (
-                          <div key={payment.id} className="flex justify-between">
+                        {order.payments.map((payment, idx) => (
+                          <div key={payment.id || idx} className="flex justify-between">
                             <span className="text-gray-500">{payment.method}:</span>
                             <span className="font-medium text-gray-900">₹{parseFloat(payment.amount).toFixed(2)}</span>
                           </div>
@@ -216,12 +242,26 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                           <span className="font-semibold text-gray-900">₹{order.payments.reduce((sum, payment) => sum + parseFloat(payment.amount || 0), 0).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between">
-                          <span className="text-gray-500">Status:</span>
-                          <span className="font-medium text-green-600">{order.payments.every((payment) => payment.status === 'PAID') ? 'PAID' : 'PENDING'}</span>
+                          <span className="text-gray-500">Payment Status:</span>
+                          <span className={`font-medium ${!isUnpaid ? 'text-green-600' : 'text-amber-600'}`}>
+                            {!isUnpaid ? 'PAID' : 'PARTIAL'}
+                          </span>
                         </div>
+                        {isUnpaid && (
+                          <div className="flex justify-between border-t border-gray-100 pt-2 mt-2">
+                            <span className="font-semibold text-red-600">Remaining Due:</span>
+                            <span className="font-semibold text-red-600">₹{(parseFloat(order.total_amount) - totalPaidAmount).toFixed(2)}</span>
+                          </div>
+                        )}
                       </div>
                     ) : (
-                      <p className="text-sm text-gray-500">No payment records found.</p>
+                      <div className="space-y-1 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Payment Status:</span>
+                          <span className="font-medium text-amber-600">PENDING (Unpaid)</span>
+                        </div>
+                        <p className="text-xs text-gray-400">Punched — payment not yet collected</p>
+                      </div>
                     )}
                   </div>
 
@@ -239,14 +279,24 @@ export const OrderDetailsModal = ({ isOpen, onClose, orderId }) => {
                            <span className="font-medium">-₹{parseFloat(order.discount_amount).toFixed(2)}</span>
                          </div>
                        )}
-                       <div className="flex justify-between">
-                         <span className="text-gray-500">CGST ({(itemTaxRate / 2).toFixed(2)}%):</span>
-                         <span className="font-medium text-gray-900">₹{(itemTaxTotal / 2).toFixed(2)}</span>
-                       </div>
-                       <div className="flex justify-between mt-1">
-                         <span className="text-gray-500">SGST ({(itemTaxRate / 2).toFixed(2)}%):</span>
-                         <span className="font-medium text-gray-900">₹{(itemTaxTotal / 2).toFixed(2)}</span>
-                       </div>
+                       {gstTotal > 0 && (
+                         <>
+                           <div className="flex justify-between">
+                             <span className="text-gray-500">CGST:</span>
+                             <span className="font-medium text-gray-900">₹{(gstTotal / 2).toFixed(2)}</span>
+                           </div>
+                           <div className="flex justify-between mt-1">
+                             <span className="text-gray-500">SGST:</span>
+                             <span className="font-medium text-gray-900">₹{(gstTotal / 2).toFixed(2)}</span>
+                           </div>
+                         </>
+                       )}
+                       {vatTotal > 0 && (
+                         <div className="flex justify-between mt-1">
+                           <span className="text-gray-500">VAT:</span>
+                           <span className="font-medium text-gray-900">₹{vatTotal.toFixed(2)}</span>
+                         </div>
+                       )}
                        {Math.abs(roundOff) > 0.001 && (
                          <div className="flex justify-between mt-1">
                            <span className="text-gray-500">Round Off:</span>

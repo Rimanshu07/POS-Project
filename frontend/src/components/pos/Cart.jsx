@@ -18,21 +18,31 @@ export const Cart = () => {
     }
   }, [location.state, items.length, navigate]);
 
-  // Frontend calculation for display purposes only.
+  // Subtotal without GST is the base.
+  // Discount is subtracted from subtotal first, then GST / VAT is calculated on the discounted amount.
   const subtotal = getSubtotal();
   const discountAmount = discount.type === 'FLAT' 
     ? parseFloat(discount.value || 0) 
     : subtotal * (parseFloat(discount.value || 0) / 100);
-    
-  const discountedSubtotal = Math.max(0, subtotal - discountAmount);
   
-  const taxAmount = items.reduce((sum, item) => {
+  const effectiveDiscount = Math.min(subtotal, Math.max(0, discountAmount));
+  const discountedSubtotal = subtotal - effectiveDiscount;
+
+  const { gstAmount, vatAmount } = items.reduce((acc, item) => {
     const lineTotal = parseFloat(item.price) * item.quantity;
-    const proportion = subtotal > 0 ? lineTotal / subtotal : 0;
-    const itemDiscount = discountAmount * proportion;
-    const discountedLine = lineTotal - itemDiscount;
-    return sum + (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
-  }, 0);
+    const itemDiscount = subtotal > 0 ? (lineTotal / subtotal) * effectiveDiscount : 0;
+    const discountedLine = Math.max(0, lineTotal - itemDiscount);
+    const tax = (discountedLine * parseFloat(item.gst_percentage || 0) / 100);
+    
+    if (item.gst_type?.toUpperCase() === 'VAT') {
+      acc.vatAmount += tax;
+    } else {
+      acc.gstAmount += tax;
+    }
+    return acc;
+  }, { gstAmount: 0, vatAmount: 0 });
+
+  const taxAmount = gstAmount + vatAmount;
 
   const exactTotal = discountedSubtotal + taxAmount;
   const roundedTotal = Math.round(exactTotal);
@@ -151,6 +161,8 @@ export const Cart = () => {
             <input 
               type="number" 
               min="0"
+              max={discount.type === 'PERCENT' ? '100' : undefined}
+              step="any"
               value={discount.value}
               onChange={e => setDiscount(e.target.value, discount.type)}
               className="w-16 text-right bg-transparent border-b border-dashed border-[#D9D6CB] focus:outline-none focus:border-[#0E6B4F] focus:text-[#0E6B4F] tabular-nums"
@@ -164,14 +176,24 @@ export const Cart = () => {
             <span className="tabular-nums">-₹{discountAmount.toFixed(2)}</span>
           </div>
         )}
-        <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
-          <span>CGST</span>
-          <span className="tabular-nums text-[#24231F]">₹{(taxAmount / 2).toFixed(2)}</span>
-        </div>
-        <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
-          <span>SGST</span>
-          <span className="tabular-nums text-[#24231F]">₹{(taxAmount / 2).toFixed(2)}</span>
-        </div>
+        {gstAmount > 0 && (
+          <>
+            <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
+              <span>CGST</span>
+              <span className="tabular-nums text-[#24231F]">₹{(gstAmount / 2).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
+              <span>SGST</span>
+              <span className="tabular-nums text-[#24231F]">₹{(gstAmount / 2).toFixed(2)}</span>
+            </div>
+          </>
+        )}
+        {vatAmount > 0 && (
+          <div className="flex justify-between text-xs text-[#78766D] mb-1 sm:text-sm sm:mb-1.5">
+            <span>VAT</span>
+            <span className="tabular-nums text-[#24231F]">₹{vatAmount.toFixed(2)}</span>
+          </div>
+        )}
 
         <div className="flex justify-between items-baseline pt-2 border-t border-dashed border-[#E5E2D9] mb-2.5 sm:pt-3 sm:mb-4">
           <span className="text-sm font-semibold text-[#24231F]">Total</span>

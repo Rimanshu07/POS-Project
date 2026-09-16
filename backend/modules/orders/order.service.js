@@ -35,6 +35,8 @@ const createOrder = async (orderData, userId) => {
         const productsMap = new Map(dbProducts.map(p => [p.id, p]));
 
         let totalDiscount = new Prisma.Decimal(orderData.discount_amount || 0);
+        let discountType = orderData.discount_type || 'FLAT';
+        let discountRate = new Prisma.Decimal(orderData.discount_rate || 0);
         let subtotal = new Prisma.Decimal(0);
         const preDiscountItems = [];
 
@@ -61,13 +63,37 @@ const createOrder = async (orderData, userId) => {
           });
         }
 
-        // Distribute order discount proportionally to items
-        const orderItems = preDiscountItems.map(item => {
+        if (discountType === 'PERCENT') {
+          if (discountRate.lt(0) || discountRate.gt(100)) {
+            throw new AppError('Percentage discount must be between 0% and 100%', 'VALIDATION_ERROR', 400);
+          }
+          totalDiscount = subtotal.mul(discountRate).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+        } else {
+          if (totalDiscount.lt(0)) {
+            throw new AppError('Discount amount cannot be negative', 'VALIDATION_ERROR', 400);
+          }
+          if (totalDiscount.gt(subtotal)) {
+            throw new AppError('Discount amount cannot exceed the subtotal', 'VALIDATION_ERROR', 400);
+          }
+        }
+
+        // Discount is applied to item amount before tax (Subtotal without GST - Discount = Taxable amount)
+        // GST / VAT is calculated on the discounted line total
+        let remainingDiscount = new Prisma.Decimal(totalDiscount);
+
+        const orderItems = preDiscountItems.map((item, index) => {
           let itemDiscount = new Prisma.Decimal(0);
           if (subtotal.gt(0) && totalDiscount.gt(0)) {
-            itemDiscount = item.line_total.mul(totalDiscount).div(subtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+            if (index === preDiscountItems.length - 1) {
+              // Last item gets the exact remaining discount to prevent penny rounding differences
+              itemDiscount = Prisma.Decimal.max(0, Prisma.Decimal.min(remainingDiscount, item.line_total));
+            } else {
+              itemDiscount = item.line_total.mul(totalDiscount).div(subtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
+            }
+            remainingDiscount = remainingDiscount.sub(itemDiscount);
           }
-          const discountedLineTotal = item.line_total.sub(itemDiscount);
+          const discountedLineTotal = Prisma.Decimal.max(0, item.line_total.sub(itemDiscount));
+          // GST or VAT is calculated on the discounted line total
           const gstAmount = discountedLineTotal.mul(item.gst_percentage).div(100).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
           
           return {
@@ -85,54 +111,71 @@ const createOrder = async (orderData, userId) => {
           ? new Prisma.Decimal(0)
           : taxAmount.mul(100).div(discountedSubtotal).toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
         const exactTotal = discountedSubtotal.add(taxAmount);
-        // Default Rounding: below 0.5 down, >= 0.5 up
-        let totalAmount = new Prisma.Decimal(Math.round(exactTotal.toNumber()));
+        let totalAmount = new Prisma.Decimal(Math.max(0, Math.round(exactTotal.toNumber())));
+
+        // Fetch existing order early to include already paid amount in validation
+        let orderNumber = orderData.order_number;
+        let existingOrder = null;
+        let alreadyPaidAmount = new Prisma.Decimal(0);
+        
+        if (orderNumber && String(orderNumber).trim() !== '') {
+          existingOrder = await tx.order.findUnique({ 
+            where: { order_number: String(orderNumber).trim() },
+            include: { payments: true }
+          });
+          if (existingOrder) {
+            alreadyPaidAmount = (existingOrder.payments || [])
+              .filter(p => p.status === 'PAID')
+              .reduce((sum, p) => sum.add(new Prisma.Decimal(p.amount)), new Prisma.Decimal(0));
+              
+            const isFullyPaid = alreadyPaidAmount.gte(existingOrder.total_amount);
+            if (isFullyPaid) {
+              throw new AppError('This order has already been settled and fully paid.', 'VALIDATION_ERROR', 400);
+            }
+          }
+        }
 
         const payments = Array.isArray(orderData.payment)
           ? orderData.payment
           : [];
           
-        const paidAmount = payments.reduce(
+        const newPaidAmount = payments.reduce(
           (sum, payment) => sum.add(new Prisma.Decimal(payment.amount)),
           new Prisma.Decimal(0)
         );
         
+        if (newPaidAmount.lt(0)) {
+          throw new AppError('Payment amount cannot be negative', 'VALIDATION_ERROR', 400);
+        }
+
+        const totalPaidSoFar = alreadyPaidAmount.add(newPaidAmount);
+
         let orderStatus = 'COMPLETED';
-        if (paidAmount.lt(totalAmount)) {
-          if (paidAmount.isZero()) {
-            orderStatus = 'PENDING';
+        if (totalPaidSoFar.lt(totalAmount)) {
+          if (totalPaidSoFar.isZero()) {
+            orderStatus = 'COMPLETED';
           } else {
-             // If they paid an amount close to exactTotal (at least the floor of exactTotal), accept it and adjust totalAmount so the difference becomes round-off.
              const floorTotal = new Prisma.Decimal(Math.floor(exactTotal.toNumber()));
-             if (paidAmount.gte(floorTotal)) {
-               totalAmount = paidAmount;
+             if (totalPaidSoFar.gte(floorTotal)) {
+               totalAmount = totalPaidSoFar;
              } else {
-               throw new AppError('Partial payments are not supported. Either pay full amount or mark as Pay Later.', 'VALIDATION_ERROR', 400);
+               orderStatus = 'COMPLETED';
              }
           }
-        } else if (paidAmount.gt(totalAmount) && paidAmount.lt(totalAmount.add(1))) {
-          // If they paid slightly more (within 1 rupee) and it's exact change for them, let's treat the overpayment as round-off if they want the bill to match payment exactly.
-          // Actually, if paidAmount > totalAmount, it usually means "Change" is returned. We keep totalAmount as rounded, and calculate change.
+        } else if (totalPaidSoFar.gt(totalAmount) && totalPaidSoFar.lt(totalAmount.add(1))) {
+          // Exact change rounding logic
         }
         
         const cashPayment = payments.find(payment => payment.method === 'CASH');
-        const changeAmount = cashPayment && paidAmount.gt(totalAmount)
-          ? paidAmount.sub(totalAmount)
+        const changeAmount = cashPayment && totalPaidSoFar.gt(totalAmount)
+          ? totalPaidSoFar.sub(totalAmount)
           : new Prisma.Decimal(0);
 
-        // 3. Payment Validation
-        // 4. Order Number Generation / Assignment
-        let orderNumber = orderData.order_number;
-        let existingOrder = null;
+        // 4. Order Number Generation
         if (!orderNumber || String(orderNumber).trim() === '') {
           const today = new Date();
-          const datePrefix = today.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+          const datePrefix = today.toISOString().split('T')[0].replace(/-/g, '');
           orderNumber = await orderRepo.generateOrderNumber(tx, datePrefix);
-        } else {
-          existingOrder = await tx.order.findUnique({ where: { order_number: String(orderNumber).trim() } });
-          if (existingOrder && existingOrder.status !== 'PENDING') {
-            throw new AppError('Only PENDING orders can be edited or settled.', 'VALIDATION_ERROR', 400);
-          }
         }
 
         // 5. Database Inserts / Updates
@@ -141,13 +184,15 @@ const createOrder = async (orderData, userId) => {
         if (existingOrder) {
           // Update existing pending order
           await tx.orderItem.deleteMany({ where: { order_id: existingOrder.id } });
-          await tx.payment.deleteMany({ where: { order_id: existingOrder.id } });
+          // DO NOT delete existing payments!
           
           finalOrder = await tx.order.update({
             where: { id: existingOrder.id },
             data: {
               status: orderStatus,
               subtotal: subtotal,
+              discount_type: discountType,
+              discount_rate: discountRate,
               discount_amount: totalDiscount,
               tax_percent: taxPercent,
               tax_amount: taxAmount,
@@ -156,7 +201,7 @@ const createOrder = async (orderData, userId) => {
                 create: orderItems
               },
               payments: {
-                create: payments.map(payment => ({
+                create: payments.filter(p => new Prisma.Decimal(p.amount).gt(0)).map(payment => ({
                   method: payment.method,
                   amount: new Prisma.Decimal(payment.amount),
                   status: 'PAID'
@@ -181,6 +226,8 @@ const createOrder = async (orderData, userId) => {
               reference_no: orderNumber,
               status: orderStatus,
               subtotal: subtotal,
+              discount_type: discountType,
+              discount_rate: discountRate,
               discount_amount: totalDiscount,
               tax_percent: taxPercent,
               tax_amount: taxAmount,
@@ -190,7 +237,7 @@ const createOrder = async (orderData, userId) => {
                 create: orderItems
               },
               payments: {
-                create: payments.map(payment => ({
+                create: payments.filter(p => new Prisma.Decimal(p.amount).gt(0)).map(payment => ({
                   method: payment.method,
                   amount: new Prisma.Decimal(payment.amount),
                   status: 'PAID'
@@ -282,6 +329,8 @@ const getOrderInvoice = async (id) => {
       gst_amount: parseFloat(item.gst_amount || 0).toFixed(2)
     })),
     subtotal: parseFloat(order.subtotal).toFixed(2),
+    discount_type: order.discount_type || 'FLAT',
+    discount_rate: parseFloat(order.discount_rate || 0).toFixed(2),
     discount_amount: parseFloat(order.discount_amount).toFixed(2),
     tax_percent: parseFloat(order.tax_percent).toFixed(2),
     tax_amount: parseFloat(order.tax_amount).toFixed(2),

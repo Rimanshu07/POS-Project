@@ -27,7 +27,7 @@ import { useCartStore } from '../store/useCartStore';
 
 export const Dashboard = () => {
   const navigate = useNavigate();
-  const { setItems, setDiscount, setPendingOrderNumber } = useCartStore();
+  const { setItems, setDiscount, setPendingOrderNumber, setAlreadyPaid, setExistingPayments } = useCartStore();
   const [filterPreset, setFilterPreset] = useState('today');
   const [isSettlingId, setIsSettlingId] = useState(null);
   
@@ -90,9 +90,19 @@ export const Dashboard = () => {
         gst_percentage: item.gst_percentage
       }));
       
+      const discountType = order.discount_type || 'FLAT';
+      const discountVal = discountType === 'PERCENT'
+        ? (order.discount_rate !== undefined && order.discount_rate !== null ? parseFloat(order.discount_rate) : '')
+        : (order.discount_amount !== undefined && order.discount_amount !== null ? parseFloat(order.discount_amount) : '');
+      
+      const validPayments = (order.payments || []).filter(p => p.status === 'PAID');
+      const alreadyPaid = validPayments.reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
       setItems(cartItems);
-      setDiscount(parseFloat(order.discount_amount || 0), 'FLAT');
+      setDiscount(discountVal, discountType);
       setPendingOrderNumber(order.order_number);
+      setAlreadyPaid(alreadyPaid);
+      setExistingPayments(validPayments);
       navigate('/pos', { state: { autoCheckout: true } });
     } catch (error) {
       console.error('Failed to settle directly', error);
@@ -100,6 +110,22 @@ export const Dashboard = () => {
     } finally {
       setIsSettlingId(null);
     }
+  };
+
+  // Payment status badge helper
+  const getPaymentBadge = (order) => {
+    if (order.status === 'CANCELLED') return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-red-100 text-red-800">Cancelled</span>;
+    
+    const totalPaidAmount = (order.payments || [])
+      .filter(p => p.status === 'PAID')
+      .reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      
+    if (totalPaidAmount >= parseFloat(order.total_amount || 0)) {
+      return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-emerald-100 text-emerald-800">Paid</span>;
+    } else if (totalPaidAmount > 0) {
+      return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-blue-100 text-blue-800">Partial</span>;
+    }
+    return <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-amber-100 text-amber-800">Pending</span>;
   };
 
   return (
@@ -111,28 +137,10 @@ export const Dashboard = () => {
             Dashboard
           </h1>
         </div>
-
-        {/* <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
-              <Calendar className="w-4 h-4 text-gray-500" />
-            </div>
-            <select
-              value={filterPreset}
-              onChange={(e) => setFilterPreset(e.target.value)}
-              className="pl-9 pr-8 py-2 bg-white border border-gray-200 text-gray-700 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full outline-none shadow-sm cursor-pointer"
-            >
-              <option value="today">Today</option>
-              <option value="yesterday">Yesterday</option>
-              <option value="this_week">This Week</option>
-              <option value="this_month">This Month</option>
-            </select>
-          </div>
-        </div> */}
       </div>
 
-      {/* 8 Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      {/* 4 Cards Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         {cards.map((card, idx) =>
           card.isButton ? (
             <div
@@ -155,11 +163,11 @@ export const Dashboard = () => {
               >
                 {card.icon}
               </div>
-              <div>
-                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-gray-500 uppercase tracking-wider truncate">
                   {card.title}
                 </p>
-                <p className={`text-2xl font-extrabold mt-1 ${card.textColor}`}>
+                <p className={`text-2xl font-extrabold mt-1 ${card.textColor} truncate`}>
                   {card.value}
                 </p>
               </div>
@@ -168,16 +176,17 @@ export const Dashboard = () => {
         )}
       </div>
 
-      {/* Recent Sales Table */}
+      {/* Recent Sales */}
       <div className="bg-white rounded-xl card-shadow border border-gray-100 overflow-hidden mt-8">
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white">
+        <div className="px-4 sm:px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-white">
           <div className="flex items-center gap-2">
             <RotateCcw className="w-5 h-5 text-indigo-600" />
             <h2 className="text-lg font-bold text-gray-900">Recent Sales</h2>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* ── DESKTOP TABLE (md and above) ── */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-sm text-gray-600">
             <thead className="text-xs uppercase bg-gray-50 text-gray-500 font-semibold border-b border-gray-100">
               <tr>
@@ -193,10 +202,7 @@ export const Dashboard = () => {
             <tbody>
               {isLoadingOrders ? (
                 <tr>
-                  <td
-                    colSpan="8"
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
+                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                     Loading recent sales...
                   </td>
                 </tr>
@@ -222,37 +228,37 @@ export const Dashboard = () => {
                     </td>
                     <td className="px-6 py-4 text-indigo-600 font-bold">
                       ₹{Number(order.total_amount || 0).toFixed(2)}
+                      {(() => {
+                        const totalPaid = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                        const due = parseFloat(order.total_amount || 0) - totalPaid;
+                        if (due > 0 && order.status !== 'CANCELLED') {
+                          return <div className="text-xs font-bold text-red-600 mt-0.5">Due: ₹{due.toFixed(2)}</div>;
+                        }
+                        return null;
+                      })()}
                     </td>
                     <td className="px-6 py-4 text-gray-900 font-medium">
                       <div className="font-medium text-gray-900">Gross: ₹{Number(order.subtotal || 0).toFixed(2)}</div>
                       {Number(order.discount_amount || 0) > 0 && <div className="text-xs text-red-600">Disc: -₹{Number(order.discount_amount || 0).toFixed(2)}</div>}
-                      <div className="text-xs text-indigo-600">GST: ₹{Number(order.tax_amount || 0).toFixed(2)}</div>
+                      <div className="text-xs text-indigo-600">Tax: ₹{Number(order.tax_amount || 0).toFixed(2)}</div>
                       <div className="text-xs text-gray-500">Round: ₹{(
                         Number(order.total_amount || 0) - 
                         (Number(order.subtotal || 0) - Number(order.discount_amount || 0) + Number(order.tax_amount || 0))
                       ).toFixed(2)}</div>
                     </td>
                     <td className="px-6 py-4">
-                      {order.status === 'COMPLETED' ? (
-                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-emerald-100 text-emerald-800">
-                          Paid
-                        </span>
-                      ) : order.status === 'PENDING' ? (
-                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-yellow-100 text-yellow-800">
-                          Pending
-                        </span>
-                      ) : (
-                        <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-red-100 text-red-800">
-                          {order.status}
-                        </span>
-                      )}
+                      {getPaymentBadge(order)}
                     </td>
                     <td className="px-6 py-4 text-right whitespace-nowrap">
-                      {order.status === 'PENDING' && (
+                      {(() => {
+                        const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                        const isUnpaid = totalPaidAmount < parseFloat(order.total_amount || 0);
+                        return isUnpaid && order.status !== 'CANCELLED';
+                      })() && (
                         <button
                           onClick={() => handleDirectSettle(order.id)}
                           disabled={isSettlingId === order.id}
-                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70 disabled:animate-none"
+                          className="mr-2 text-white bg-amber-600 hover:bg-amber-700 px-3 py-1.5 rounded-md transition-colors inline-flex items-center text-xs font-semibold shadow-sm disabled:opacity-70"
                           title="Settle Payment"
                         >
                           {isSettlingId === order.id ? (
@@ -275,25 +281,92 @@ export const Dashboard = () => {
                 ))
               ) : (
                 <tr>
-                  <td
-                    colSpan="7"
-                    className="px-6 py-8 text-center text-gray-500"
-                  >
+                  <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
                     No recent sales found
                   </td>
                 </tr>
               )}
             </tbody>
           </table>
+        </div>
 
-          <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
-            <button
-              onClick={() => navigate("/orders")}
-              className="px-4 py-2 bg-white text-indigo-600 border border-indigo-200 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-50 transition-modern flex items-center gap-2"
-            >
-              <RotateCcw className="w-4 h-4" /> View All Sales
-            </button>
-          </div>
+        {/* ── MOBILE CARDS (below md) ── */}
+        <div className="md:hidden divide-y divide-gray-100">
+          {isLoadingOrders ? (
+            <div className="p-4 text-center text-gray-500 text-sm">Loading recent sales...</div>
+          ) : ordersData?.orders?.length > 0 ? (
+            ordersData.orders.map((order) => (
+              <div key={order.id} className="p-4 space-y-3">
+                {/* Top row: Invoice + badge */}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <p className="font-semibold text-gray-900 text-sm">{order.order_number}</p>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {format(new Date(order.created_at), "dd/MM/yyyy")} · {format(new Date(order.created_at), "hh:mm a").toLowerCase()}
+                    </p>
+                  </div>
+                  {getPaymentBadge(order)}
+                </div>
+                {/* Financials row */}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <span>Items: <strong className="text-gray-900">{order.items?.reduce((sum, item) => sum + item.quantity, 0) || 0}</strong></span>
+                  <span className="flex items-center gap-1 whitespace-nowrap">Total: <strong className="text-indigo-600">₹{Number(order.total_amount || 0).toFixed(2)}</strong>
+                    {(() => {
+                      const totalPaid = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                      const due = parseFloat(order.total_amount || 0) - totalPaid;
+                      if (due > 0 && order.status !== 'CANCELLED') {
+                        return <span className="text-[10px] font-bold text-red-600">(Due: ₹{due.toFixed(2)})</span>;
+                      }
+                      return null;
+                    })()}
+                  </span>
+                  <span>Gross: ₹{Number(order.subtotal || 0).toFixed(2)}</span>
+                  {Number(order.discount_amount || 0) > 0 && (
+                    <span className="text-red-600">Disc: -₹{Number(order.discount_amount || 0).toFixed(2)}</span>
+                  )}
+                  <span>Tax: ₹{Number(order.tax_amount || 0).toFixed(2)}</span>
+                </div>
+                {/* Action buttons */}
+                <div className="flex gap-2 pt-1">
+                  {(() => {
+                    const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                    const isUnpaid = totalPaidAmount < parseFloat(order.total_amount || 0);
+                    return isUnpaid && order.status !== 'CANCELLED';
+                  })() && (
+                    <button
+                      onClick={() => handleDirectSettle(order.id)}
+                      disabled={isSettlingId === order.id}
+                      className="flex-1 text-white bg-amber-600 hover:bg-amber-700 px-3 py-2 rounded-lg transition-colors inline-flex items-center justify-center text-xs font-semibold shadow-sm disabled:opacity-70"
+                    >
+                      {isSettlingId === order.id ? (
+                        <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                      ) : (
+                        <CheckCircle className="w-4 h-4 mr-1" />
+                      )}
+                      Settle
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedOrderId(order.id)}
+                    className="flex-1 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-modern inline-flex items-center justify-center py-2 text-xs font-semibold gap-1"
+                  >
+                    <Eye className="w-4 h-4" /> View Details
+                  </button>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="p-6 text-center text-gray-500 text-sm">No recent sales found</div>
+          )}
+        </div>
+
+        <div className="p-4 border-t border-gray-100 bg-gray-50/50 flex justify-end">
+          <button
+            onClick={() => navigate("/orders")}
+            className="px-4 py-2 bg-white text-indigo-600 border border-indigo-200 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-50 transition-modern flex items-center gap-2"
+          >
+            <RotateCcw className="w-4 h-4" /> View All Sales
+          </button>
         </div>
       </div>
 

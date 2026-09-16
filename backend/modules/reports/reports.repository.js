@@ -135,13 +135,20 @@ const getDailySalesReport = async (year, month) => {
       COALESCE(SUM(o.total_amount), 0) AS total_grand_total,
       COALESCE(SUM(o.discount_amount), 0) AS total_discount,
       COALESCE(SUM(oi_agg.total_items), 0) AS total_items_sold,
-      COALESCE(SUM(o.tax_amount), 0) AS total_tax
+      COALESCE(SUM(o.tax_amount), 0) AS total_tax,
+      COALESCE(SUM(p_agg.total_paid), 0) AS total_paid
     FROM \`orders\` o
     LEFT JOIN (
       SELECT order_id, SUM(quantity) as total_items
       FROM \`order_items\`
       GROUP BY order_id
     ) oi_agg ON oi_agg.order_id = o.id
+    LEFT JOIN (
+      SELECT order_id, SUM(amount) as total_paid
+      FROM \`payments\`
+      WHERE status = 'PAID'
+      GROUP BY order_id
+    ) p_agg ON p_agg.order_id = o.id
     WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
@@ -160,7 +167,8 @@ const getDailySalesReport = async (year, month) => {
       total_grand_total: Number(row.total_grand_total),
       total_discount: Number(row.total_discount),
       total_items_sold: Number(row.total_items_sold),
-      total_tax: Number(row.total_tax)
+      total_tax: Number(row.total_tax),
+      total_paid: Number(row.total_paid || 0)
     });
   });
 
@@ -189,12 +197,15 @@ const getDailyProductDetails = async (date) => {
       p.id AS product_id,
       p.name AS product_name,
       c.name AS category_name,
+      COALESCE(p.gst_type, 'GST') AS tax_type,
       COUNT(DISTINCT o.id) AS order_count,
       COALESCE(AVG(oi.unit_price), 0) AS avg_price,
       COALESCE(SUM(oi.quantity), 0) AS total_quantity,
       COALESCE(AVG(oi.gst_percentage), 0) AS tax_rate,
       COALESCE(SUM(oi.gst_amount), 0) AS tax_amount,
-      COALESCE(SUM(oi.line_total + oi.gst_amount), 0) AS total_amount
+      COALESCE(SUM(oi.line_total), 0) AS gross_amount,
+      COALESCE(SUM(oi.discount_amount), 0) AS discount_amount,
+      COALESCE(SUM(oi.line_total - oi.discount_amount + oi.gst_amount), 0) AS total_amount
     FROM \`order_items\` oi
     JOIN \`orders\` o ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
@@ -202,7 +213,7 @@ const getDailyProductDetails = async (date) => {
     WHERE LOWER(o.status) IN ('completed', 'pending')
       AND o.created_at >= ${startDate}
       AND o.created_at <= ${endDate}
-    GROUP BY p.id, p.name, c.name
+    GROUP BY p.id, p.name, c.name, p.gst_type
     ORDER BY total_amount DESC
   `;
 
@@ -212,8 +223,11 @@ const getDailyProductDetails = async (date) => {
     order_count: Number(row.order_count),
     avg_price: Number(row.avg_price),
     total_quantity: Number(row.total_quantity),
+    tax_type: row.tax_type ? String(row.tax_type).toUpperCase() : 'GST',
     tax_rate: Number(row.tax_rate),
     tax_amount: Number(row.tax_amount),
+    gross_amount: Number(row.gross_amount),
+    discount_amount: Number(row.discount_amount),
     total_amount: Number(row.total_amount)
   }));
 };
@@ -282,12 +296,15 @@ const getMonthlyProductDetails = async (year, month) => {
     SELECT 
       c.name AS category_name,
       p.name AS product_name,
+      COALESCE(p.gst_type, 'GST') AS tax_type,
       COUNT(DISTINCT o.id) AS order_count,
       COALESCE(SUM(oi.quantity), 0) AS total_quantity,
       COALESCE(AVG(oi.unit_price), 0) AS avg_price,
       COALESCE(AVG(oi.gst_percentage), 0) AS tax_rate,
       COALESCE(SUM(oi.gst_amount), 0) AS tax_amount,
-      COALESCE(SUM(oi.line_total + oi.gst_amount), 0) AS total_amount
+      COALESCE(SUM(oi.line_total), 0) AS gross_amount,
+      COALESCE(SUM(oi.discount_amount), 0) AS discount_amount,
+      COALESCE(SUM(oi.line_total - oi.discount_amount + oi.gst_amount), 0) AS total_amount
     FROM \`orders\` o
     JOIN \`order_items\` oi ON oi.order_id = o.id
     JOIN \`products\` p ON oi.product_id = p.id
@@ -295,7 +312,7 @@ const getMonthlyProductDetails = async (year, month) => {
     WHERE LOWER(o.status) IN ('completed', 'pending')
       AND YEAR(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) = ${year}
       AND MONTH(CONVERT_TZ(o.created_at, '+00:00', '+05:30')) = ${month}
-    GROUP BY c.name, p.name
+    GROUP BY c.name, p.name, p.gst_type
     ORDER BY total_amount DESC
   `;
 
@@ -304,8 +321,11 @@ const getMonthlyProductDetails = async (year, month) => {
     order_count: Number(r.order_count),
     total_quantity: Number(r.total_quantity),
     avg_price: Number(r.avg_price),
+    tax_type: r.tax_type ? String(r.tax_type).toUpperCase() : 'GST',
     tax_rate: Number(r.tax_rate),
     tax_amount: Number(r.tax_amount),
+    gross_amount: Number(r.gross_amount),
+    discount_amount: Number(r.discount_amount),
     total_amount: Number(r.total_amount)
   }));
 };

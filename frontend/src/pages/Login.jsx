@@ -90,7 +90,7 @@ export const Login = () => {
             </p>
 
             {/* Stats */}
-            <div className="grid grid-cols-3 gap-4 pt-6">
+            {/* <div className="grid grid-cols-3 gap-4 pt-6">
               <div>
                 <div className="text-3xl font-bold">10k+</div>
                 <div className="text-xs text-white/70 mt-1 uppercase tracking-wider font-semibold">
@@ -109,7 +109,7 @@ export const Login = () => {
                   Support
                 </div>
               </div>
-            </div>
+            </div> */}
           </div>
 
           {/* Footer */}
@@ -286,7 +286,7 @@ export const Login = () => {
           </div>
 
           {/* Trust badges */}
-          <div className="mt-6 flex items-center justify-center gap-6 text-gray-400">
+          {/* <div className="mt-6 flex items-center justify-center gap-6 text-gray-400">
             <div className="flex items-center gap-1.5 text-xs font-medium">
               <ShieldCheck className="w-4 h-4 text-emerald-500" />
               SSL Secured
@@ -295,7 +295,7 @@ export const Login = () => {
               <Lock className="w-4 h-4 text-emerald-500" />
               Encrypted
             </div>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

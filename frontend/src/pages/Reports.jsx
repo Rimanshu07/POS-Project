@@ -99,7 +99,13 @@ export const Reports = () => {
       const gstAmount = parseFloat(order.tax_amount || 0);
       const discountAmount = parseFloat(order.discount_amount || 0);
       const roundOff = totalAmount - (amount - discountAmount + gstAmount);
-      const paymentStatus = order.payments?.[0]?.status || 'PENDING';
+      const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+      let paymentStatus = 'PENDING';
+      if (totalPaidAmount >= totalAmount) {
+        paymentStatus = 'PAID';
+      } else if (totalPaidAmount > 0) {
+        paymentStatus = 'PARTIAL';
+      }
       
       return {
         'Date': formatDate(order.created_at),
@@ -107,7 +113,7 @@ export const Reports = () => {
         'Items': totalItems,
         'Gross Amount': amount.toFixed(2),
         'Discount': discountAmount.toFixed(2),
-        'GST': gstAmount.toFixed(2),
+        'Tax (GST/VAT)': gstAmount.toFixed(2),
         'Round Off': roundOff.toFixed(2),
         'Total': totalAmount.toFixed(2),
         'Status': order.status,
@@ -205,8 +211,8 @@ export const Reports = () => {
         {activeTab === 'all' && (
           <div className="space-y-4">
             {/* Filters Section - Matching PHP all_sales.php */}
-            <div className="bg-gray-50 rounded-xl p-5 border border-gray-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-gray-50 rounded-xl p-4 sm:p-5 border border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-gray-700 mb-1">Start Date</label>
                   <input
@@ -246,12 +252,13 @@ export const Reports = () => {
                   >
                     <option value="">All</option>
                     <option value="paid">Paid</option>
+                    <option value="partial">Partial</option>
                     <option value="pending">Pending</option>
                     <option value="failed">Failed</option>
                     <option value="refunded">Refunded</option>
                   </select>
                 </div>
-                <div className="flex items-end gap-2">
+                <div className="flex items-end gap-2 sm:col-span-2 md:col-span-3 lg:col-span-2">
                   <button
                     onClick={() => refetch()}
                     className="flex-1 inline-flex items-center justify-center px-4 py-2 text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg"
@@ -283,7 +290,7 @@ export const Reports = () => {
                 <table className="min-w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Date</th>
+                      <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 shadow-[1px_0_0_0_#e5e7eb]">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-bold text-gray-700 uppercase tracking-wider">Invoice No</th>
                       <th className="px-4 py-3 text-center text-xs font-bold text-gray-700 uppercase tracking-wider">Items</th>
                       <th className="px-4 py-3 text-right text-xs font-bold text-gray-700 uppercase tracking-wider">Total</th>
@@ -313,15 +320,21 @@ export const Reports = () => {
                         const gstAmount = parseFloat(order.tax_amount || 0);
                         const discountAmount = parseFloat(order.discount_amount || 0);
                         const roundOff = totalAmount - (amount - discountAmount + gstAmount);
-                        const paymentStatus = order.payments?.[0]?.status || 'PENDING';
+                        const totalPaidAmount = (order.payments || []).filter(p => p.status === 'PAID').reduce((sum, p) => sum + parseFloat(p.amount), 0);
+                        let paymentStatus = 'PENDING';
+                        if (totalPaidAmount >= totalAmount) {
+                          paymentStatus = 'PAID';
+                        } else if (totalPaidAmount > 0) {
+                          paymentStatus = 'PARTIAL';
+                        }
                         
                         return (
                           <tr 
                             key={order.id} 
-                            className="hover:bg-gray-50 cursor-pointer transition-colors"
+                            className="hover:bg-gray-50 cursor-pointer transition-colors group"
                             onClick={() => setSelectedOrderId(order.id)}
                           >
-                            <td className="px-4 py-3 text-sm text-gray-900">
+                            <td className="px-4 py-3 text-sm text-gray-900 sticky left-0 bg-white group-hover:bg-gray-50 z-10 shadow-[1px_0_0_0_#e5e7eb]">
                               <div>{formatDate(order.created_at)}</div>
                               <small className="text-gray-500">{formatTime(order.created_at)}</small>
                             </td>
@@ -331,7 +344,7 @@ export const Reports = () => {
                             <td className="px-4 py-3 text-sm text-right">
                               <div className="font-medium text-gray-900">Gross: {formatCurrency(amount)}</div>
                               {discountAmount > 0 && <div className="text-xs text-red-600">Disc: -{formatCurrency(discountAmount)}</div>}
-                              <div className="text-xs text-indigo-600">GST: {formatCurrency(gstAmount)}</div>
+                              <div className="text-xs text-indigo-600">Tax: {formatCurrency(gstAmount)}</div>
                               <div className="text-xs text-gray-500">Round: {formatCurrency(roundOff)}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
